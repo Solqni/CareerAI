@@ -1,4 +1,4 @@
-﻿from sqlalchemy import JSON, ForeignKey, String, Text
+from sqlalchemy import JSON, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
@@ -11,7 +11,9 @@ class JobAnalysis(Base):
     jd_text: Mapped[str] = mapped_column(Text)
     parsed_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
-    requirements: Mapped[list["JobRequirement"]] = relationship(back_populates="job")
+    requirements: Mapped[list["JobRequirement"]] = relationship(
+        back_populates="job", cascade="all, delete-orphan"
+    )
 
 
 class JobRequirement(Base):

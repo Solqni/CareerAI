@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
+import BackButton from '@/components/BackButton.vue'
 
 // 模拟面试对话演示气泡
 const demoScript = [
@@ -33,6 +34,11 @@ const features = [
 
 <template>
   <div class="page">
+    <div class="page-bg"></div>
+    <div class="page-blob blob-a"></div>
+    <div class="page-blob blob-b"></div>
+    <div class="page-inner">
+    <BackButton class="page-back" />
     <div class="page-header anim-fade-up">
       <div class="header-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -77,11 +83,27 @@ const features = [
       <button class="btn">开始真实模拟面试</button>
       <p class="cta-note">评估维度：逻辑性 · 完整性 · 专业性</p>
     </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.page { padding: 2rem; max-width: 760px; margin: 0 auto; }
+.page { min-height: 100vh; position: relative; overflow: hidden; }
+.page-bg {
+  position: fixed; inset: 0; z-index: -2;
+  background: linear-gradient(-45deg, #f0fdf4, #e0f2fe, #eef2ff, #f0fdfa);
+  background-size: 400% 400%;
+  animation: gradientShift 12s ease infinite;
+}
+.page-blob {
+  position: fixed; border-radius: 50%; filter: blur(70px); z-index: -1;
+  animation: float 8s ease-in-out infinite;
+}
+.blob-a { width: 300px; height: 300px; background: #43e97b; opacity: 0.1; top: -60px; left: -40px; }
+.blob-b { width: 260px; height: 260px; background: #4facfe; opacity: 0.09; bottom: -50px; right: -30px; animation-delay: -4s; }
+
+.page-inner { padding: 2rem; max-width: 760px; margin: 0 auto; }
+.page-back { margin-bottom: 1.2rem; }
 
 .page-header { display: flex; align-items: center; gap: 1.1rem; margin-bottom: 1.6rem; }
 .header-icon {
@@ -102,13 +124,14 @@ const features = [
 .tips { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.8rem; margin-bottom: 1.4rem; }
 .tip {
   --c: var(--primary);
-  background: #fff;
-  border: 1px solid #e2e8f0;
+  background: rgba(255,255,255,0.6);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(226,232,240,0.5);
   border-radius: 12px;
   padding: 0.85rem 1rem;
-  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease, background 0.25s ease;
 }
-.tip:hover { transform: translateY(-3px); border-color: var(--c); box-shadow: 0 8px 20px color-mix(in srgb, var(--c) 18%, transparent); }
+.tip:hover { transform: translateY(-3px); border-color: var(--c); background: rgba(255,255,255,0.8); box-shadow: 0 8px 20px color-mix(in srgb, var(--c) 18%, transparent); }
 .tip strong { display: block; color: var(--c); margin-bottom: 0.2rem; font-size: 0.92rem; }
 .tip span { font-size: 0.8rem; color: #718096; }
 
@@ -132,7 +155,8 @@ const features = [
 .dot.green { background: #68d391; }
 .chat-title { margin-left: 0.6rem; color: #a0aec0; font-size: 0.8rem; }
 .chat-body {
-  background: #f7fafc;
+  background: rgba(247,250,252,0.6);
+  backdrop-filter: blur(10px);
   padding: 1.3rem;
   min-height: 280px;
   display: flex;
@@ -150,7 +174,7 @@ const features = [
   line-height: 1.6;
 }
 .bubble .who { display: block; font-size: 0.7rem; opacity: 0.65; margin-bottom: 0.2rem; }
-.bubble-row.ai .bubble { background: #fff; border: 1px solid #e2e8f0; color: #2d3748; border-top-left-radius: 4px; }
+.bubble-row.ai .bubble { background: rgba(255,255,255,0.7); backdrop-filter: blur(8px); border: 1px solid rgba(226,232,240,0.5); color: #2d3748; border-top-left-radius: 4px; }
 .bubble-row.user .bubble { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; border-top-right-radius: 4px; }
 
 /* CTA */
