@@ -25,6 +25,10 @@ onMounted(() => setTimeout(() => (shown.value = true), 400))
 
 <template>
   <div class="page">
+    <div class="page-bg"></div>
+    <div class="page-blob blob-a"></div>
+    <div class="page-blob blob-b"></div>
+    <div class="page-inner">
     <div class="page-header anim-fade-up">
       <div class="header-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -105,11 +109,26 @@ onMounted(() => setTimeout(() => (shown.value = true), 400))
         </div>
       </div>
     </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.page { padding: 2rem; max-width: 860px; margin: 0 auto; }
+.page { min-height: 100vh; position: relative; overflow: hidden; }
+.page-bg {
+  position: fixed; inset: 0; z-index: -2;
+  background: linear-gradient(-45deg, #eff6ff, #fdf2f8, #eef2ff, #f0fdf4);
+  background-size: 400% 400%;
+  animation: gradientShift 12s ease infinite;
+}
+.page-blob {
+  position: fixed; border-radius: 50%; filter: blur(70px); z-index: -1;
+  animation: float 8s ease-in-out infinite;
+}
+.blob-a { width: 320px; height: 320px; background: #667eea; opacity: 0.1; top: -60px; left: -50px; }
+.blob-b { width: 280px; height: 280px; background: #f093fb; opacity: 0.09; bottom: -50px; right: -30px; animation-delay: -4s; }
+
+.page-inner { padding: 2rem; max-width: 860px; margin: 0 auto; }
 
 .page-header { display: flex; align-items: center; gap: 1.1rem; margin-bottom: 1.6rem; }
 .header-icon {
@@ -131,10 +150,12 @@ onMounted(() => setTimeout(() => (shown.value = true), 400))
   display: flex;
   align-items: center;
   gap: 2rem;
-  background: #fff;
+  background: rgba(255,255,255,0.6);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.5);
   border-radius: 18px;
   padding: 1.8rem;
-  box-shadow: 0 4px 20px rgba(102,126,234,0.08);
+  box-shadow: 0 4px 24px rgba(102,126,234,0.08);
   margin-bottom: 1.4rem;
 }
 .score-ring { position: relative; width: 150px; height: 150px; flex-shrink: 0; }
@@ -167,7 +188,7 @@ onMounted(() => setTimeout(() => (shown.value = true), 400))
 
 /* 面板 */
 .panels { display: grid; grid-template-columns: 1.2fr 1fr; gap: 1.2rem; }
-.panel { background: #fff; border-radius: 16px; padding: 1.5rem; box-shadow: 0 2px 12px rgba(0,0,0,0.05); }
+.panel { background: rgba(255,255,255,0.6); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.5); border-radius: 16px; padding: 1.5rem; box-shadow: 0 2px 16px rgba(0,0,0,0.05); }
 .panel h3 { font-size: 1.02rem; margin-bottom: 1.2rem; color: #2d3748; }
 
 /* 条形图 */
@@ -189,13 +210,14 @@ onMounted(() => setTimeout(() => (shown.value = true), 400))
   align-items: center;
   gap: 0.7rem;
   padding: 0.7rem 0.9rem;
-  background: #f7fafc;
+  background: rgba(255,255,255,0.5);
+  backdrop-filter: blur(8px);
   border-radius: 10px;
   font-size: 0.88rem;
   animation: bubbleIn 0.5s ease both;
   transition: transform 0.2s ease, background 0.2s ease;
 }
-.gap-item:hover { transform: translateX(4px); background: #edf2f7; }
+.gap-item:hover { transform: translateX(4px); background: rgba(255,255,255,0.7); }
 .prio {
   font-size: 0.7rem;
   color: #fff;

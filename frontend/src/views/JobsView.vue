@@ -13,6 +13,10 @@ async function handleParse() {
 
 <template>
   <div class="page">
+    <div class="page-bg"></div>
+    <div class="page-blob blob-a"></div>
+    <div class="page-blob blob-b"></div>
+    <div class="page-inner">
     <div class="page-header anim-fade-up">
       <div class="header-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -42,11 +46,26 @@ async function handleParse() {
         </button>
       </div>
     </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.page { padding: 2rem; max-width: 820px; margin: 0 auto; }
+.page { min-height: 100vh; position: relative; overflow: hidden; }
+.page-bg {
+  position: fixed; inset: 0; z-index: -2;
+  background: linear-gradient(-45deg, #faf5ff, #fdf2f8, #f3e8ff, #e0f2fe);
+  background-size: 400% 400%;
+  animation: gradientShift 12s ease infinite;
+}
+.page-blob {
+  position: fixed; border-radius: 50%; filter: blur(70px); z-index: -1;
+  animation: float 8s ease-in-out infinite;
+}
+.blob-a { width: 300px; height: 300px; background: #764ba2; opacity: 0.1; top: -60px; right: -40px; }
+.blob-b { width: 250px; height: 250px; background: #f093fb; opacity: 0.1; bottom: -50px; left: -30px; animation-delay: -4s; }
+
+.page-inner { padding: 2rem; max-width: 820px; margin: 0 auto; }
 
 .page-header { display: flex; align-items: center; gap: 1.1rem; margin-bottom: 1.6rem; }
 .header-icon {
@@ -66,15 +85,16 @@ async function handleParse() {
 /* 提示卡片 */
 .tips { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.8rem; margin-bottom: 1.4rem; }
 .tip {
-  background: #fff;
-  border: 1px solid #eee5f7;
+  background: rgba(255,255,255,0.6);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(238,229,247,0.5);
   border-radius: 12px;
   padding: 0.8rem 1rem;
   font-size: 0.85rem;
   color: #718096;
-  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
 }
-.tip:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(118,75,162,0.12); }
+.tip:hover { transform: translateY(-3px); background: rgba(255,255,255,0.8); box-shadow: 0 8px 20px rgba(118,75,162,0.12); }
 .tip strong { display: block; color: #764ba2; margin-bottom: 0.2rem; font-size: 0.9rem; }
 
 /* 编辑区 */
@@ -82,17 +102,20 @@ async function handleParse() {
   width: 100%;
   min-height: 260px;
   padding: 1.2rem;
-  border: 1.5px solid #e2e8f0;
+  border: 1.5px solid rgba(226,232,240,0.6);
   border-radius: 14px;
+  background: rgba(255,255,255,0.65);
+  backdrop-filter: blur(10px);
   font-size: 0.95rem;
   font-family: inherit;
   line-height: 1.7;
   resize: vertical;
   outline: none;
-  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
 }
 .editor-wrap textarea:focus {
   border-color: #764ba2;
+  background: rgba(255,255,255,0.85);
   box-shadow: 0 0 0 4px rgba(118,75,162,0.1);
 }
 .editor-meta {
