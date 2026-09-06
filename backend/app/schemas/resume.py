@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.schemas.common import ORMBase
 
@@ -17,21 +17,33 @@ class ResumeOut(ORMBase):
 # ===== LLM 结构化输出 =====
 
 class ParsedSkill(BaseModel):
-    skill_name: str = Field(description="技能名称")
+    skill_name: str | None = Field(default=None, description="技能名称")
     proficiency: int = Field(default=3, ge=1, le=5, description="熟练度 1-5")
+
+    @field_validator("proficiency", mode="before")
+    @classmethod
+    def coerce_proficiency(cls, v):
+        if v is None:
+            return 3
+        if isinstance(v, str):
+            try:
+                return int(v)
+            except ValueError:
+                return 3
+        return v
 
 
 class ParsedExperience(BaseModel):
-    type: str = Field(description="经历类型: work / internship / project")
-    title: str = Field(description="职位或项目名称")
+    type: str | None = Field(default=None, description="经历类型: work / internship / project")
+    title: str | None = Field(default=None, description="职位或项目名称")
     description: str | None = Field(default=None, description="经历描述")
     date_range: str | None = Field(default=None, description="时间范围")
 
 
 class ParsedEducation(BaseModel):
-    school: str = Field(description="学校名称")
-    degree: str = Field(description="学历")
-    major: str = Field(description="专业")
+    school: str | None = Field(default=None, description="学校名称")
+    degree: str | None = Field(default=None, description="学历")
+    major: str | None = Field(default=None, description="专业")
     date_range: str | None = Field(default=None, description="就读时间")
 
 

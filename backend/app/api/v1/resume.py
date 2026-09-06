@@ -81,6 +81,8 @@ async def _do_parse_resume(
     await db.execute(delete(UserExperience).where(UserExperience.user_id == current_user.id))
 
     for skill in parsed.skills:
+        if not skill.skill_name:
+            continue
         db.add(UserSkill(
             user_id=current_user.id,
             skill_name=skill.skill_name,
@@ -91,8 +93,8 @@ async def _do_parse_resume(
     for exp in parsed.experiences:
         db.add(UserExperience(
             user_id=current_user.id,
-            type=exp.type,
-            title=exp.title,
+            type=exp.type or "work",
+            title=exp.title or "未命名",
             description=exp.description,
             date_range=exp.date_range,
         ))
