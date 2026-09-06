@@ -127,6 +127,7 @@ const levelLabel = (l: string) => ({ must: '必备', plus: '加分' }[l] || l)
         </div>
       </div>
     </div>
+    </div>
   </div>
 </template>
 

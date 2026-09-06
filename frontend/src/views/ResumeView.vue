@@ -168,6 +168,7 @@ const typeLabel = (t: string) => ({ work: '工作经历', internship: '实习经
         </div>
       </div>
     </div>
+    </div>
   </div>
 </template>
 
