@@ -82,5 +82,3 @@ docker compose up -d --build
 - 后端分层：router → service → repository
 - LLM API Key 仅通过环境变量注入，严禁提交至代码仓库
 
-## License
-课程设计项目，仅供学习交流。
