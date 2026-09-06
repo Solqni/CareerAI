@@ -15,19 +15,8 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "dev-secret-change-me"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
 
-    # 数据库
-    POSTGRES_HOST: str = "localhost"
-    POSTGRES_PORT: int = 5432
-    POSTGRES_USER: str = "careerai"
-    POSTGRES_PASSWORD: str = "careerai_password"
-    POSTGRES_DB: str = "careerai"
-
-    @property
-    def DATABASE_URL(self) -> str:
-        return (
-            f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
-            f"@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
-        )
+    # 数据库（默认使用本地 SQLite，配置 DATABASE_URL 可切换到 PostgreSQL）
+    DATABASE_URL: str = "sqlite+aiosqlite:///./careerai.db"
 
     # Redis
     REDIS_HOST: str = "localhost"
