@@ -1,61 +1,15 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { parseResumeText, uploadResumeFile } from '@/api/resume'
+import BackButton from '@/components/BackButton.vue'
 
 const resumeText = ref('')
 const loading = ref(false)
-const errorMsg = ref('')
-const result = ref<any>(null)
-const fileName = ref('')
-const fileInput = ref<HTMLInputElement | null>(null)
 
 async function handleParse() {
   if (!resumeText.value.trim()) return
   loading.value = true
-  errorMsg.value = ''
-  result.value = null
-  try {
-    const res = await parseResumeText(resumeText.value)
-    result.value = res.data.parsed_json
-  } catch (e: any) {
-    errorMsg.value = e.response?.data?.detail || e.message || '解析失败'
-  } finally {
-    loading.value = false
-  }
+  setTimeout(() => { loading.value = false; alert('简历解析占位：请接入后端 API') }, 800)
 }
-
-function onFileChange(e: Event) {
-  const target = e.target as HTMLInputElement
-  if (target.files && target.files[0]) {
-    fileName.value = target.files[0].name
-    handleUpload(target.files[0])
-  }
-}
-
-function onDrop(e: DragEvent) {
-  e.preventDefault()
-  if (e.dataTransfer?.files && e.dataTransfer.files[0]) {
-    fileName.value = e.dataTransfer.files[0].name
-    handleUpload(e.dataTransfer.files[0])
-  }
-}
-
-async function handleUpload(file: File) {
-  loading.value = true
-  errorMsg.value = ''
-  result.value = null
-  try {
-    const res = await uploadResumeFile(file)
-    result.value = res.data.parsed_json
-  } catch (e: any) {
-    errorMsg.value = e.response?.data?.detail || e.message || '上传解析失败'
-  } finally {
-    loading.value = false
-  }
-}
-
-const proficiencyLabel = (p: number) => ['初学', '了解', '熟悉', '熟练', '精通'][Math.min(p - 1, 4)] || '熟悉'
-const typeLabel = (t: string) => ({ work: '工作经历', internship: '实习经历', project: '项目经历' }[t] || t)
 </script>
 
 <template>
@@ -64,6 +18,7 @@ const typeLabel = (t: string) => ({ work: '工作经历', internship: '实习经
     <div class="page-blob blob-a"></div>
     <div class="page-blob blob-b"></div>
     <div class="page-inner">
+    <BackButton class="page-back" />
     <div class="page-header anim-fade-up">
       <div class="header-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -77,19 +32,13 @@ const typeLabel = (t: string) => ({ work: '工作经历', internship: '实习经
     </div>
 
     <!-- 上传区域 -->
-    <div
-      class="upload-zone anim-fade-up anim-delay-1"
-      @click="fileInput?.click()"
-      @dragover.prevent
-      @drop="onDrop"
-    >
-      <input ref="fileInput" type="file" accept=".pdf,.docx,.doc,.md,.txt" hidden @change="onFileChange" />
+    <div class="upload-zone anim-fade-up anim-delay-1">
       <div class="upload-inner">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />
         </svg>
-        <p>{{ fileName || '拖拽文件到此处，或' }} <span class="link">点击上传</span></p>
-        <small>支持 PDF / Word / Markdown / TXT 格式，文件大小不超过 10MB</small>
+        <p>拖拽文件到此处，或 <span class="link">点击上传</span></p>
+        <small>支持 PDF / Word 格式，文件大小不超过 10MB</small>
       </div>
     </div>
 
@@ -105,65 +54,6 @@ const typeLabel = (t: string) => ({ work: '工作经历', internship: '实习经
         </button>
       </div>
     </div>
-<!-- 错误提示 -->
-	    <div v-if="errorMsg" class="error-msg anim-fade-up">
-	      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-	      {{ errorMsg }}
-	    </div>
-
-	    <!-- 解析结果 -->
-	    <div v-if="result" class="result-card anim-fade-up">
-	      <h3>解析结果</h3>
-
-	      <!-- 基本信息 -->
-	      <div v-if="result.name || result.email || result.phone" class="result-section">
-	        <h4>基本信息</h4>
-	        <div class="info-row">
-	          <span v-if="result.name"><strong>姓名：</strong>{{ result.name }}</span>
-	          <span v-if="result.email"><strong>邮箱：</strong>{{ result.email }}</span>
-	          <span v-if="result.phone"><strong>电话：</strong>{{ result.phone }}</span>
-	        </div>
-	      </div>
-
-	      <!-- 个人概述 -->
-	      <div v-if="result.summary" class="result-section">
-	        <h4>个人概述</h4>
-	        <p class="summary-text">{{ result.summary }}</p>
-	      </div>
-
-	      <!-- 技能 -->
-	      <div v-if="result.skills?.length" class="result-section">
-	        <h4>技能清单</h4>
-	        <div class="skill-tags">
-	          <span v-for="skill in result.skills" :key="skill.skill_name" class="skill-tag">
-	            {{ skill.skill_name }}
-	            <small>{{ proficiencyLabel(skill.proficiency) }}</small>
-	          </span>
-	        </div>
-	      </div>
-
-	      <!-- 经历 -->
-	      <div v-if="result.experiences?.length" class="result-section">
-	        <h4>经历</h4>
-	        <div v-for="(exp, i) in result.experiences" :key="i" class="exp-item">
-	          <div class="exp-header">
-	            <span class="exp-type">{{ typeLabel(exp.type) }}</span>
-	            <strong>{{ exp.title }}</strong>
-	            <small v-if="exp.date_range">{{ exp.date_range }}</small>
-	          </div>
-	          <p v-if="exp.description" class="exp-desc">{{ exp.description }}</p>
-	        </div>
-	      </div>
-
-	      <!-- 教育 -->
-	      <div v-if="result.education?.length" class="result-section">
-	        <h4>教育背景</h4>
-	        <div v-for="(edu, i) in result.education" :key="i" class="edu-item">
-	          <strong>{{ edu.school }}</strong>
-	          <span>{{ edu.degree }} · {{ edu.major }}</span>
-	          <small v-if="edu.date_range">{{ edu.date_range }}</small>
-	        </div>
-	      </div>
     </div>
   </div>
 </template>
@@ -184,6 +74,7 @@ const typeLabel = (t: string) => ({ work: '工作经历', internship: '实习经
 .blob-b { width: 250px; height: 250px; background: #f093fb; opacity: 0.1; bottom: -50px; right: -30px; animation-delay: -4s; }
 
 .page-inner { padding: 2rem; max-width: 820px; margin: 0 auto; }
+.page-back { margin-bottom: 1.2rem; }
 
 .page-header { display: flex; align-items: center; gap: 1.1rem; margin-bottom: 1.8rem; }
 .header-icon {
@@ -292,82 +183,4 @@ const typeLabel = (t: string) => ({ work: '工作经历', internship: '实习经
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }
-
-/* 错误提示 */
-.error-msg {
-  display: flex; align-items: center; gap: 0.5rem;
-  padding: 1rem 1.2rem;
-  margin-top: 1.2rem;
-  background: #fff5f5;
-  border: 1px solid #fed7d7;
-  border-radius: 12px;
-  color: #c53030;
-  font-size: 0.9rem;
-}
-.error-msg svg { width: 18px; height: 18px; flex-shrink: 0; }
-
-/* 解析结果 */
-.result-card {
-  margin-top: 2rem;
-  background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
-  padding: 1.8rem;
-}
-.result-card h3 {
-  font-size: 1.2rem; color: #1a202c; margin-bottom: 1.2rem;
-  padding-bottom: 0.8rem; border-bottom: 1px solid #edf2f7;
-}
-.result-section { margin-bottom: 1.6rem; }
-.result-section h4 {
-  font-size: 0.95rem; color: #4a5568; margin-bottom: 0.6rem;
-  display: flex; align-items: center; gap: 0.4rem;
-}
-.result-section h4::before {
-  content: ''; width: 3px; height: 16px; border-radius: 2px;
-  background: linear-gradient(135deg, #667eea, #764ba2);
-}
-
-.info-row { display: flex; flex-wrap: wrap; gap: 1.5rem; font-size: 0.9rem; color: #2d3748; }
-.summary-text { font-size: 0.9rem; color: #4a5568; line-height: 1.7; }
-
-/* 技能标签 */
-.skill-tags { display: flex; flex-wrap: wrap; gap: 0.6rem; }
-.skill-tag {
-  display: inline-flex; align-items: center; gap: 0.4rem;
-  padding: 0.4rem 0.9rem;
-  background: linear-gradient(135deg, #f3f4ff, #fbfbff);
-  border: 1px solid #c3c9f5;
-  border-radius: 8px;
-  font-size: 0.85rem; color: #4a5568;
-  transition: transform 0.2s ease;
-}
-.skill-tag:hover { transform: translateY(-2px); }
-.skill-tag small { color: #a5b4fc; font-size: 0.72rem; }
-
-/* 经历 */
-.exp-item {
-  padding: 0.9rem 1rem;
-  background: #f7f8fc;
-  border-radius: 10px;
-  margin-bottom: 0.6rem;
-}
-.exp-header { display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.3rem; }
-.exp-type {
-  font-size: 0.72rem; padding: 0.15rem 0.5rem;
-  background: #667eea; color: #fff; border-radius: 4px; white-space: nowrap;
-}
-.exp-header strong { font-size: 0.9rem; color: #1a202c; }
-.exp-header small { font-size: 0.78rem; color: #a0aec0; margin-left: auto; }
-.exp-desc { font-size: 0.85rem; color: #718096; line-height: 1.6; }
-
-/* 教育 */
-.edu-item {
-  display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap;
-  padding: 0.7rem 1rem;
-  background: #f7f8fc; border-radius: 10px; margin-bottom: 0.5rem;
-  font-size: 0.88rem; color: #4a5568;
-}
-.edu-item strong { color: #1a202c; }
-.edu-item small { color: #a0aec0; margin-left: auto; }
 </style>

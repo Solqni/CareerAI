@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
+import BackButton from '@/components/BackButton.vue'
 
 // 模拟面试对话演示气泡
 const demoScript = [
@@ -37,6 +38,7 @@ const features = [
     <div class="page-blob blob-a"></div>
     <div class="page-blob blob-b"></div>
     <div class="page-inner">
+    <BackButton class="page-back" />
     <div class="page-header anim-fade-up">
       <div class="header-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -101,6 +103,7 @@ const features = [
 .blob-b { width: 260px; height: 260px; background: #4facfe; opacity: 0.09; bottom: -50px; right: -30px; animation-delay: -4s; }
 
 .page-inner { padding: 2rem; max-width: 760px; margin: 0 auto; }
+.page-back { margin-bottom: 1.2rem; }
 
 .page-header { display: flex; align-items: center; gap: 1.1rem; margin-bottom: 1.6rem; }
 .header-icon {

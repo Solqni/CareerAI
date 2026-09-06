@@ -1,28 +1,15 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { parseJobDescription } from '@/api/job'
+import BackButton from '@/components/BackButton.vue'
 
 const jdText = ref('')
 const loading = ref(false)
-const errorMsg = ref('')
-const result = ref<any>(null)
 
 async function handleParse() {
   if (!jdText.value.trim()) return
   loading.value = true
-  errorMsg.value = ''
-  result.value = null
-  try {
-    const res = await parseJobDescription(jdText.value)
-    result.value = res.data.parsed_json
-  } catch (e: any) {
-    errorMsg.value = e.response?.data?.detail || e.message || '解析失败'
-  } finally {
-    loading.value = false
-  }
+  setTimeout(() => { loading.value = false; alert('JD 解析占位：请接入后端 API') }, 800)
 }
-
-const levelLabel = (l: string) => ({ must: '必备', plus: '加分' }[l] || l)
 </script>
 
 <template>
@@ -31,6 +18,7 @@ const levelLabel = (l: string) => ({ must: '必备', plus: '加分' }[l] || l)
     <div class="page-blob blob-a"></div>
     <div class="page-blob blob-b"></div>
     <div class="page-inner">
+    <BackButton class="page-back" />
     <div class="page-header anim-fade-up">
       <div class="header-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -60,69 +48,6 @@ const levelLabel = (l: string) => ({ must: '必备', plus: '加分' }[l] || l)
         </button>
       </div>
     </div>
-<!-- 错误提示 -->
-	    <div v-if="errorMsg" class="error-msg anim-fade-up">
-	      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-	      {{ errorMsg }}
-	    </div>
-
-	    <!-- 解析结果 -->
-	    <div v-if="result" class="result-card anim-fade-up">
-	      <h3>解析结果</h3>
-
-	      <!-- 岗位名称 -->
-	      <div v-if="result.position_title" class="result-section">
-	        <h4>岗位名称</h4>
-	        <p class="position-title">{{ result.position_title }}</p>
-	      </div>
-
-	      <!-- 岗位概述 -->
-	      <div v-if="result.summary" class="result-section">
-	        <h4>岗位概述</h4>
-	        <p class="summary-text">{{ result.summary }}</p>
-	      </div>
-
-	      <!-- 岗位职责 -->
-	      <div v-if="result.responsibilities?.length" class="result-section">
-	        <h4>岗位职责</h4>
-	        <ul class="resp-list">
-	          <li v-for="(r, i) in result.responsibilities" :key="i">{{ r }}</li>
-	        </ul>
-	      </div>
-
-	      <!-- 技能要求 -->
-	      <div v-if="result.required_skills?.length" class="result-section">
-	        <h4>技能要求</h4>
-	        <div class="skill-groups">
-	          <div class="skill-group">
-	            <span class="group-label must">必备</span>
-	            <div class="skill-tags">
-	              <span v-for="s in result.required_skills.filter((x: any) => x.requirement_level !== 'plus')" :key="s.skill_name" class="skill-tag must">
-	                {{ s.skill_name }}
-	                <small v-if="s.category">{{ s.category }}</small>
-	              </span>
-	            </div>
-	          </div>
-	          <div v-if="result.required_skills.some((x: any) => x.requirement_level === 'plus')" class="skill-group">
-	            <span class="group-label plus">加分</span>
-	            <div class="skill-tags">
-	              <span v-for="s in result.required_skills.filter((x: any) => x.requirement_level === 'plus')" :key="s.skill_name" class="skill-tag plus">
-	                {{ s.skill_name }}
-	                <small v-if="s.category">{{ s.category }}</small>
-	              </span>
-	            </div>
-	          </div>
-	        </div>
-	      </div>
-
-	      <!-- 学历与经验要求 -->
-	      <div v-if="result.education_requirement || result.experience_requirement" class="result-section">
-	        <h4>任职要求</h4>
-	        <div class="req-row">
-	          <span v-if="result.education_requirement"><strong>学历：</strong>{{ result.education_requirement }}</span>
-	          <span v-if="result.experience_requirement"><strong>经验：</strong>{{ result.experience_requirement }}</span>
-	        </div>
-	      </div>
     </div>
   </div>
 </template>
@@ -143,6 +68,7 @@ const levelLabel = (l: string) => ({ must: '必备', plus: '加分' }[l] || l)
 .blob-b { width: 250px; height: 250px; background: #f093fb; opacity: 0.1; bottom: -50px; left: -30px; animation-delay: -4s; }
 
 .page-inner { padding: 2rem; max-width: 820px; margin: 0 auto; }
+.page-back { margin-bottom: 1.2rem; }
 
 .page-header { display: flex; align-items: center; gap: 1.1rem; margin-bottom: 1.6rem; }
 .header-icon {
@@ -226,93 +152,4 @@ const levelLabel = (l: string) => ({ must: '必备', plus: '加分' }[l] || l)
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }
-
-/* 错误提示 */
-.error-msg {
-  display: flex; align-items: center; gap: 0.5rem;
-  padding: 1rem 1.2rem;
-  margin-top: 1.2rem;
-  background: #fff5f5;
-  border: 1px solid #fed7d7;
-  border-radius: 12px;
-  color: #c53030;
-  font-size: 0.9rem;
-}
-.error-msg svg { width: 18px; height: 18px; flex-shrink: 0; }
-
-/* 解析结果 */
-.result-card {
-  margin-top: 2rem;
-  background: #fff;
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
-  padding: 1.8rem;
-}
-.result-card h3 {
-  font-size: 1.2rem; color: #1a202c; margin-bottom: 1.2rem;
-  padding-bottom: 0.8rem; border-bottom: 1px solid #edf2f7;
-}
-.result-section { margin-bottom: 1.6rem; }
-.result-section h4 {
-  font-size: 0.95rem; color: #4a5568; margin-bottom: 0.6rem;
-  display: flex; align-items: center; gap: 0.4rem;
-}
-.result-section h4::before {
-  content: ''; width: 3px; height: 16px; border-radius: 2px;
-  background: linear-gradient(135deg, #764ba2, #f093fb);
-}
-
-.position-title { font-size: 1.05rem; font-weight: 600; color: #1a202c; }
-.summary-text { font-size: 0.9rem; color: #4a5568; line-height: 1.7; }
-
-/* 岗位职责 */
-.resp-list { list-style: none; padding: 0; }
-.resp-list li {
-  position: relative;
-  padding: 0.5rem 0 0.5rem 1.4rem;
-  font-size: 0.88rem;
-  color: #4a5568;
-  line-height: 1.6;
-}
-.resp-list li::before {
-  content: '';
-  position: absolute; left: 0; top: 0.85rem;
-  width: 6px; height: 6px; border-radius: 50%;
-  background: #764ba2;
-}
-
-/* 技能分组 */
-.skill-groups { display: flex; flex-direction: column; gap: 1rem; }
-.skill-group { display: flex; align-items: flex-start; gap: 0.8rem; }
-.group-label {
-  flex-shrink: 0;
-  font-size: 0.75rem; font-weight: 600;
-  padding: 0.25rem 0.6rem;
-  border-radius: 6px;
-  margin-top: 0.15rem;
-}
-.group-label.must { background: #fed7d7; color: #c53030; }
-.group-label.plus { background: #c6f6d5; color: #276749; }
-.skill-tags { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-.skill-tag {
-  display: inline-flex; align-items: center; gap: 0.4rem;
-  padding: 0.35rem 0.8rem;
-  border-radius: 8px;
-  font-size: 0.85rem; color: #4a5568;
-  transition: transform 0.2s ease;
-}
-.skill-tag.must {
-  background: linear-gradient(135deg, #fff5f5, #fff0f0);
-  border: 1px solid #fed7d7;
-}
-.skill-tag.plus {
-  background: linear-gradient(135deg, #f0fff4, #e6ffed);
-  border: 1px solid #c6f6d5;
-}
-.skill-tag:hover { transform: translateY(-2px); }
-.skill-tag small { color: #a0aec0; font-size: 0.72rem; }
-
-/* 任职要求 */
-.req-row { display: flex; flex-wrap: wrap; gap: 1.5rem; font-size: 0.9rem; color: #2d3748; }
-.req-row strong { color: #764ba2; }
 </style>
