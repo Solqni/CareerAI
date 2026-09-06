@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import BackButton from '@/components/BackButton.vue'
 
 const router = useRouter()
 
@@ -29,6 +30,7 @@ onMounted(() => setTimeout(() => (shown.value = true), 400))
     <div class="page-blob blob-a"></div>
     <div class="page-blob blob-b"></div>
     <div class="page-inner">
+    <BackButton class="page-back" />
     <div class="page-header anim-fade-up">
       <div class="header-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -71,7 +73,7 @@ onMounted(() => setTimeout(() => (shown.value = true), 400))
       <div class="score-summary">
         <h3>匹配诊断摘要</h3>
         <p>你的技能基础与该岗位总体契合度较好，学历完全达标。主要差距集中在<strong>容器化部署</strong>与<strong>系统设计经验</strong>两方面，建议优先补齐。</p>
-        <button class="btn" @click="router.push('/interview')">生成学习计划 →</button>
+        <button class="btn" @click="router.push('/dashboard')">生成学习计划 →</button>
       </div>
     </div>
 
@@ -129,6 +131,7 @@ onMounted(() => setTimeout(() => (shown.value = true), 400))
 .blob-b { width: 280px; height: 280px; background: #f093fb; opacity: 0.09; bottom: -50px; right: -30px; animation-delay: -4s; }
 
 .page-inner { padding: 2rem; max-width: 860px; margin: 0 auto; }
+.page-back { margin-bottom: 1.2rem; }
 
 .page-header { display: flex; align-items: center; gap: 1.1rem; margin-bottom: 1.6rem; }
 .header-icon {

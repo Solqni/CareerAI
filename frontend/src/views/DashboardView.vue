@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import BackButton from '@/components/BackButton.vue'
 
 const router = useRouter()
 
@@ -47,13 +48,16 @@ onMounted(animateNumbers)
     <div class="page-blob blob-b"></div>
     <div class="page-blob blob-c"></div>
     <header class="topbar anim-fade">
-      <div class="brand" @click="router.push('/')">
-        <div class="brand-logo">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-          </svg>
+      <div class="topbar-left">
+        <BackButton class="topbar-back" />
+        <div class="brand" @click="router.push('/')">
+          <div class="brand-logo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+            </svg>
+          </div>
+          <span>CareerAI</span>
         </div>
-        <span>CareerAI</span>
       </div>
       <nav>
         <button v-for="n in navs" :key="n.path" @click="router.push(n.path)">
@@ -175,6 +179,7 @@ onMounted(animateNumbers)
   border-bottom: 1px solid rgba(255,255,255,0.5);
 }
 .brand { display: flex; align-items: center; gap: 0.6rem; font-weight: 800; font-size: 1.15rem; cursor: pointer; }
+.topbar-left { display: flex; align-items: center; gap: 0.9rem; }
 .brand-logo {
   width: 36px; height: 36px;
   border-radius: 10px;

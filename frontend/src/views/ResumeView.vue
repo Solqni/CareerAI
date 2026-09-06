@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import BackButton from '@/components/BackButton.vue'
 
 const resumeText = ref('')
 const loading = ref(false)
@@ -17,6 +18,7 @@ async function handleParse() {
     <div class="page-blob blob-a"></div>
     <div class="page-blob blob-b"></div>
     <div class="page-inner">
+    <BackButton class="page-back" />
     <div class="page-header anim-fade-up">
       <div class="header-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -72,6 +74,7 @@ async function handleParse() {
 .blob-b { width: 250px; height: 250px; background: #f093fb; opacity: 0.1; bottom: -50px; right: -30px; animation-delay: -4s; }
 
 .page-inner { padding: 2rem; max-width: 820px; margin: 0 auto; }
+.page-back { margin-bottom: 1.2rem; }
 
 .page-header { display: flex; align-items: center; gap: 1.1rem; margin-bottom: 1.8rem; }
 .header-icon {
