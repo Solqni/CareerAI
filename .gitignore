@@ -39,6 +39,10 @@ dist-ssr/
 # ===== Database =====
 *.sqlite
 *.sqlite3
+*.db
+
+# ===== Trae Skills =====
+.trae/
 postgres_data/
 redis_data/
 

@@ -1,4 +1,4 @@
-﻿from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.schemas.common import ORMBase
 
@@ -12,3 +12,35 @@ class ResumeOut(ORMBase):
     user_id: int
     raw_text: str | None = None
     parsed_json: dict | None = None
+
+
+# ===== LLM 结构化输出 =====
+
+class ParsedSkill(BaseModel):
+    skill_name: str = Field(description="技能名称")
+    proficiency: int = Field(default=3, ge=1, le=5, description="熟练度 1-5")
+
+
+class ParsedExperience(BaseModel):
+    type: str = Field(description="经历类型: work / internship / project")
+    title: str = Field(description="职位或项目名称")
+    description: str | None = Field(default=None, description="经历描述")
+    date_range: str | None = Field(default=None, description="时间范围")
+
+
+class ParsedEducation(BaseModel):
+    school: str = Field(description="学校名称")
+    degree: str = Field(description="学历")
+    major: str = Field(description="专业")
+    date_range: str | None = Field(default=None, description="就读时间")
+
+
+class ResumeParsedResult(BaseModel):
+    """LLM 简历解析结构化输出"""
+    name: str | None = Field(default=None, description="姓名")
+    email: str | None = Field(default=None, description="邮箱")
+    phone: str | None = Field(default=None, description="电话")
+    education: list[ParsedEducation] = Field(default_factory=list)
+    skills: list[ParsedSkill] = Field(default_factory=list)
+    experiences: list[ParsedExperience] = Field(default_factory=list)
+    summary: str | None = Field(default=None, description="个人概述")

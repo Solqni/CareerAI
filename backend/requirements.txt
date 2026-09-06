@@ -9,8 +9,9 @@ pydantic-settings==2.5.2
 
 # ===== 数据库 =====
 SQLAlchemy[asyncio]==2.0.35
-asyncpg==0.29.0
-pgvector==0.3.3
+# asyncpg==0.29.0  # PostgreSQL only — 切回 PostgreSQL 时取消注释
+# pgvector==0.3.3   # 与 numpy 2.x 不兼容，切回 PostgreSQL 时需升级版本
+aiosqlite==0.20.0
 
 # ===== 缓存 =====
 redis==5.0.8
@@ -20,12 +21,12 @@ passlib[bcrypt]==1.7.4
 python-jose[cryptography]==3.3.0
 
 # ===== AI / LLM =====
-langchain==0.3.0
-langchain-core==0.3.0
-langchain-openai==0.2.0
-langgraph==0.2.22
-langchain-text-splitters==0.3.0
-langchain-community==0.3.0
+langchain>=0.3.13
+langchain-core>=0.3.13
+langchain-openai>=0.2.0
+langgraph>=0.2.22
+langchain-text-splitters>=0.3.0
+langchain-community>=0.3.13
 openai==1.45.0
 
 # ===== 文档解析 =====
