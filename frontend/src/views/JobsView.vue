@@ -27,6 +27,10 @@ const levelLabel = (l: string) => ({ must: '必备', plus: '加分' }[l] || l)
 
 <template>
   <div class="page">
+    <div class="page-bg"></div>
+    <div class="page-blob blob-a"></div>
+    <div class="page-blob blob-b"></div>
+    <div class="page-inner">
     <div class="page-header anim-fade-up">
       <div class="header-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -56,76 +60,89 @@ const levelLabel = (l: string) => ({ must: '必备', plus: '加分' }[l] || l)
         </button>
       </div>
     </div>
+<!-- 错误提示 -->
+	    <div v-if="errorMsg" class="error-msg anim-fade-up">
+	      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+	      {{ errorMsg }}
+	    </div>
 
-    <!-- 错误提示 -->
-    <div v-if="errorMsg" class="error-msg anim-fade-up">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-      {{ errorMsg }}
-    </div>
+	    <!-- 解析结果 -->
+	    <div v-if="result" class="result-card anim-fade-up">
+	      <h3>解析结果</h3>
 
-    <!-- 解析结果 -->
-    <div v-if="result" class="result-card anim-fade-up">
-      <h3>解析结果</h3>
+	      <!-- 岗位名称 -->
+	      <div v-if="result.position_title" class="result-section">
+	        <h4>岗位名称</h4>
+	        <p class="position-title">{{ result.position_title }}</p>
+	      </div>
 
-      <!-- 岗位名称 -->
-      <div v-if="result.position_title" class="result-section">
-        <h4>岗位名称</h4>
-        <p class="position-title">{{ result.position_title }}</p>
-      </div>
+	      <!-- 岗位概述 -->
+	      <div v-if="result.summary" class="result-section">
+	        <h4>岗位概述</h4>
+	        <p class="summary-text">{{ result.summary }}</p>
+	      </div>
 
-      <!-- 岗位概述 -->
-      <div v-if="result.summary" class="result-section">
-        <h4>岗位概述</h4>
-        <p class="summary-text">{{ result.summary }}</p>
-      </div>
+	      <!-- 岗位职责 -->
+	      <div v-if="result.responsibilities?.length" class="result-section">
+	        <h4>岗位职责</h4>
+	        <ul class="resp-list">
+	          <li v-for="(r, i) in result.responsibilities" :key="i">{{ r }}</li>
+	        </ul>
+	      </div>
 
-      <!-- 岗位职责 -->
-      <div v-if="result.responsibilities?.length" class="result-section">
-        <h4>岗位职责</h4>
-        <ul class="resp-list">
-          <li v-for="(r, i) in result.responsibilities" :key="i">{{ r }}</li>
-        </ul>
-      </div>
+	      <!-- 技能要求 -->
+	      <div v-if="result.required_skills?.length" class="result-section">
+	        <h4>技能要求</h4>
+	        <div class="skill-groups">
+	          <div class="skill-group">
+	            <span class="group-label must">必备</span>
+	            <div class="skill-tags">
+	              <span v-for="s in result.required_skills.filter((x: any) => x.requirement_level !== 'plus')" :key="s.skill_name" class="skill-tag must">
+	                {{ s.skill_name }}
+	                <small v-if="s.category">{{ s.category }}</small>
+	              </span>
+	            </div>
+	          </div>
+	          <div v-if="result.required_skills.some((x: any) => x.requirement_level === 'plus')" class="skill-group">
+	            <span class="group-label plus">加分</span>
+	            <div class="skill-tags">
+	              <span v-for="s in result.required_skills.filter((x: any) => x.requirement_level === 'plus')" :key="s.skill_name" class="skill-tag plus">
+	                {{ s.skill_name }}
+	                <small v-if="s.category">{{ s.category }}</small>
+	              </span>
+	            </div>
+	          </div>
+	        </div>
+	      </div>
 
-      <!-- 技能要求 -->
-      <div v-if="result.required_skills?.length" class="result-section">
-        <h4>技能要求</h4>
-        <div class="skill-groups">
-          <div class="skill-group">
-            <span class="group-label must">必备</span>
-            <div class="skill-tags">
-              <span v-for="s in result.required_skills.filter((x: any) => x.requirement_level !== 'plus')" :key="s.skill_name" class="skill-tag must">
-                {{ s.skill_name }}
-                <small v-if="s.category">{{ s.category }}</small>
-              </span>
-            </div>
-          </div>
-          <div v-if="result.required_skills.some((x: any) => x.requirement_level === 'plus')" class="skill-group">
-            <span class="group-label plus">加分</span>
-            <div class="skill-tags">
-              <span v-for="s in result.required_skills.filter((x: any) => x.requirement_level === 'plus')" :key="s.skill_name" class="skill-tag plus">
-                {{ s.skill_name }}
-                <small v-if="s.category">{{ s.category }}</small>
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 学历与经验要求 -->
-      <div v-if="result.education_requirement || result.experience_requirement" class="result-section">
-        <h4>任职要求</h4>
-        <div class="req-row">
-          <span v-if="result.education_requirement"><strong>学历：</strong>{{ result.education_requirement }}</span>
-          <span v-if="result.experience_requirement"><strong>经验：</strong>{{ result.experience_requirement }}</span>
-        </div>
-      </div>
+	      <!-- 学历与经验要求 -->
+	      <div v-if="result.education_requirement || result.experience_requirement" class="result-section">
+	        <h4>任职要求</h4>
+	        <div class="req-row">
+	          <span v-if="result.education_requirement"><strong>学历：</strong>{{ result.education_requirement }}</span>
+	          <span v-if="result.experience_requirement"><strong>经验：</strong>{{ result.experience_requirement }}</span>
+	        </div>
+	      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.page { padding: 2rem; max-width: 820px; margin: 0 auto; }
+.page { min-height: 100vh; position: relative; overflow: hidden; }
+.page-bg {
+  position: fixed; inset: 0; z-index: -2;
+  background: linear-gradient(-45deg, #faf5ff, #fdf2f8, #f3e8ff, #e0f2fe);
+  background-size: 400% 400%;
+  animation: gradientShift 12s ease infinite;
+}
+.page-blob {
+  position: fixed; border-radius: 50%; filter: blur(70px); z-index: -1;
+  animation: float 8s ease-in-out infinite;
+}
+.blob-a { width: 300px; height: 300px; background: #764ba2; opacity: 0.1; top: -60px; right: -40px; }
+.blob-b { width: 250px; height: 250px; background: #f093fb; opacity: 0.1; bottom: -50px; left: -30px; animation-delay: -4s; }
+
+.page-inner { padding: 2rem; max-width: 820px; margin: 0 auto; }
 
 .page-header { display: flex; align-items: center; gap: 1.1rem; margin-bottom: 1.6rem; }
 .header-icon {
@@ -145,15 +162,16 @@ const levelLabel = (l: string) => ({ must: '必备', plus: '加分' }[l] || l)
 /* 提示卡片 */
 .tips { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.8rem; margin-bottom: 1.4rem; }
 .tip {
-  background: #fff;
-  border: 1px solid #eee5f7;
+  background: rgba(255,255,255,0.6);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(238,229,247,0.5);
   border-radius: 12px;
   padding: 0.8rem 1rem;
   font-size: 0.85rem;
   color: #718096;
-  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
 }
-.tip:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(118,75,162,0.12); }
+.tip:hover { transform: translateY(-3px); background: rgba(255,255,255,0.8); box-shadow: 0 8px 20px rgba(118,75,162,0.12); }
 .tip strong { display: block; color: #764ba2; margin-bottom: 0.2rem; font-size: 0.9rem; }
 
 /* 编辑区 */
@@ -161,17 +179,20 @@ const levelLabel = (l: string) => ({ must: '必备', plus: '加分' }[l] || l)
   width: 100%;
   min-height: 260px;
   padding: 1.2rem;
-  border: 1.5px solid #e2e8f0;
+  border: 1.5px solid rgba(226,232,240,0.6);
   border-radius: 14px;
+  background: rgba(255,255,255,0.65);
+  backdrop-filter: blur(10px);
   font-size: 0.95rem;
   font-family: inherit;
   line-height: 1.7;
   resize: vertical;
   outline: none;
-  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
 }
 .editor-wrap textarea:focus {
   border-color: #764ba2;
+  background: rgba(255,255,255,0.85);
   box-shadow: 0 0 0 4px rgba(118,75,162,0.1);
 }
 .editor-meta {

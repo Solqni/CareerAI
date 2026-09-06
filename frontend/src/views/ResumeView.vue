@@ -60,6 +60,10 @@ const typeLabel = (t: string) => ({ work: '工作经历', internship: '实习经
 
 <template>
   <div class="page">
+    <div class="page-bg"></div>
+    <div class="page-blob blob-a"></div>
+    <div class="page-blob blob-b"></div>
+    <div class="page-inner">
     <div class="page-header anim-fade-up">
       <div class="header-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -101,72 +105,85 @@ const typeLabel = (t: string) => ({ work: '工作经历', internship: '实习经
         </button>
       </div>
     </div>
+<!-- 错误提示 -->
+	    <div v-if="errorMsg" class="error-msg anim-fade-up">
+	      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+	      {{ errorMsg }}
+	    </div>
 
-    <!-- 错误提示 -->
-    <div v-if="errorMsg" class="error-msg anim-fade-up">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-      {{ errorMsg }}
-    </div>
+	    <!-- 解析结果 -->
+	    <div v-if="result" class="result-card anim-fade-up">
+	      <h3>解析结果</h3>
 
-    <!-- 解析结果 -->
-    <div v-if="result" class="result-card anim-fade-up">
-      <h3>解析结果</h3>
+	      <!-- 基本信息 -->
+	      <div v-if="result.name || result.email || result.phone" class="result-section">
+	        <h4>基本信息</h4>
+	        <div class="info-row">
+	          <span v-if="result.name"><strong>姓名：</strong>{{ result.name }}</span>
+	          <span v-if="result.email"><strong>邮箱：</strong>{{ result.email }}</span>
+	          <span v-if="result.phone"><strong>电话：</strong>{{ result.phone }}</span>
+	        </div>
+	      </div>
 
-      <!-- 基本信息 -->
-      <div v-if="result.name || result.email || result.phone" class="result-section">
-        <h4>基本信息</h4>
-        <div class="info-row">
-          <span v-if="result.name"><strong>姓名：</strong>{{ result.name }}</span>
-          <span v-if="result.email"><strong>邮箱：</strong>{{ result.email }}</span>
-          <span v-if="result.phone"><strong>电话：</strong>{{ result.phone }}</span>
-        </div>
-      </div>
+	      <!-- 个人概述 -->
+	      <div v-if="result.summary" class="result-section">
+	        <h4>个人概述</h4>
+	        <p class="summary-text">{{ result.summary }}</p>
+	      </div>
 
-      <!-- 个人概述 -->
-      <div v-if="result.summary" class="result-section">
-        <h4>个人概述</h4>
-        <p class="summary-text">{{ result.summary }}</p>
-      </div>
+	      <!-- 技能 -->
+	      <div v-if="result.skills?.length" class="result-section">
+	        <h4>技能清单</h4>
+	        <div class="skill-tags">
+	          <span v-for="skill in result.skills" :key="skill.skill_name" class="skill-tag">
+	            {{ skill.skill_name }}
+	            <small>{{ proficiencyLabel(skill.proficiency) }}</small>
+	          </span>
+	        </div>
+	      </div>
 
-      <!-- 技能 -->
-      <div v-if="result.skills?.length" class="result-section">
-        <h4>技能清单</h4>
-        <div class="skill-tags">
-          <span v-for="skill in result.skills" :key="skill.skill_name" class="skill-tag">
-            {{ skill.skill_name }}
-            <small>{{ proficiencyLabel(skill.proficiency) }}</small>
-          </span>
-        </div>
-      </div>
+	      <!-- 经历 -->
+	      <div v-if="result.experiences?.length" class="result-section">
+	        <h4>经历</h4>
+	        <div v-for="(exp, i) in result.experiences" :key="i" class="exp-item">
+	          <div class="exp-header">
+	            <span class="exp-type">{{ typeLabel(exp.type) }}</span>
+	            <strong>{{ exp.title }}</strong>
+	            <small v-if="exp.date_range">{{ exp.date_range }}</small>
+	          </div>
+	          <p v-if="exp.description" class="exp-desc">{{ exp.description }}</p>
+	        </div>
+	      </div>
 
-      <!-- 经历 -->
-      <div v-if="result.experiences?.length" class="result-section">
-        <h4>经历</h4>
-        <div v-for="(exp, i) in result.experiences" :key="i" class="exp-item">
-          <div class="exp-header">
-            <span class="exp-type">{{ typeLabel(exp.type) }}</span>
-            <strong>{{ exp.title }}</strong>
-            <small v-if="exp.date_range">{{ exp.date_range }}</small>
-          </div>
-          <p v-if="exp.description" class="exp-desc">{{ exp.description }}</p>
-        </div>
-      </div>
-
-      <!-- 教育 -->
-      <div v-if="result.education?.length" class="result-section">
-        <h4>教育背景</h4>
-        <div v-for="(edu, i) in result.education" :key="i" class="edu-item">
-          <strong>{{ edu.school }}</strong>
-          <span>{{ edu.degree }} · {{ edu.major }}</span>
-          <small v-if="edu.date_range">{{ edu.date_range }}</small>
-        </div>
-      </div>
+	      <!-- 教育 -->
+	      <div v-if="result.education?.length" class="result-section">
+	        <h4>教育背景</h4>
+	        <div v-for="(edu, i) in result.education" :key="i" class="edu-item">
+	          <strong>{{ edu.school }}</strong>
+	          <span>{{ edu.degree }} · {{ edu.major }}</span>
+	          <small v-if="edu.date_range">{{ edu.date_range }}</small>
+	        </div>
+	      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.page { padding: 2rem; max-width: 820px; margin: 0 auto; }
+.page { min-height: 100vh; position: relative; overflow: hidden; }
+.page-bg {
+  position: fixed; inset: 0; z-index: -2;
+  background: linear-gradient(-45deg, #eef2ff, #f3e8ff, #e0f2fe, #f0fdf4);
+  background-size: 400% 400%;
+  animation: gradientShift 12s ease infinite;
+}
+.page-blob {
+  position: fixed; border-radius: 50%; filter: blur(70px); z-index: -1;
+  animation: float 8s ease-in-out infinite;
+}
+.blob-a { width: 300px; height: 300px; background: #667eea; opacity: 0.12; top: -60px; left: -40px; }
+.blob-b { width: 250px; height: 250px; background: #f093fb; opacity: 0.1; bottom: -50px; right: -30px; animation-delay: -4s; }
+
+.page-inner { padding: 2rem; max-width: 820px; margin: 0 auto; }
 
 .page-header { display: flex; align-items: center; gap: 1.1rem; margin-bottom: 1.8rem; }
 .header-icon {
@@ -185,15 +202,16 @@ const typeLabel = (t: string) => ({ work: '工作经历', internship: '实习经
 
 /* 上传区 */
 .upload-zone {
-  border: 2px dashed #c3c9f5;
+  border: 2px dashed rgba(102,126,234,0.35);
   border-radius: 16px;
-  background: #fbfbff;
+  background: rgba(255,255,255,0.6);
+  backdrop-filter: blur(10px);
   transition: all 0.3s ease;
   cursor: pointer;
 }
 .upload-zone:hover {
   border-color: var(--primary);
-  background: #f3f4ff;
+  background: rgba(255,255,255,0.8);
   transform: translateY(-2px);
   box-shadow: 0 10px 24px rgba(102,126,234,0.12);
 }
@@ -227,17 +245,20 @@ const typeLabel = (t: string) => ({ work: '工作经历', internship: '实习经
   width: 100%;
   min-height: 260px;
   padding: 1.2rem;
-  border: 1.5px solid #e2e8f0;
+  border: 1.5px solid rgba(226,232,240,0.6);
   border-radius: 14px;
+  background: rgba(255,255,255,0.65);
+  backdrop-filter: blur(10px);
   font-size: 0.95rem;
   font-family: inherit;
   line-height: 1.7;
   resize: vertical;
   outline: none;
-  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
 }
 .editor-wrap textarea:focus {
   border-color: var(--primary);
+  background: rgba(255,255,255,0.85);
   box-shadow: 0 0 0 4px rgba(102,126,234,0.1);
 }
 .editor-meta {

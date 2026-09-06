@@ -42,6 +42,10 @@ onMounted(animateNumbers)
 
 <template>
   <div class="dashboard">
+    <div class="page-bg"></div>
+    <div class="page-blob blob-a"></div>
+    <div class="page-blob blob-b"></div>
+    <div class="page-blob blob-c"></div>
     <header class="topbar anim-fade">
       <div class="brand" @click="router.push('/')">
         <div class="brand-logo">
@@ -141,19 +145,34 @@ onMounted(animateNumbers)
 </template>
 
 <style scoped>
-.dashboard { min-height: 100vh; background: #f5f7fa; }
+.dashboard { min-height: 100vh; position: relative; overflow: hidden; }
+.page-bg {
+  position: fixed; inset: 0; z-index: -2;
+  background: linear-gradient(-45deg, #f0f4ff, #e0e7ff, #f3e8ff, #e0f2fe);
+  background-size: 400% 400%;
+  animation: gradientShift 12s ease infinite;
+}
+.page-blob {
+  position: fixed; border-radius: 50%; filter: blur(70px); z-index: -1;
+  animation: float 8s ease-in-out infinite;
+}
+.blob-a { width: 320px; height: 320px; background: #667eea; opacity: 0.1; top: -60px; left: -40px; }
+.blob-b { width: 280px; height: 280px; background: #f093fb; opacity: 0.08; bottom: -40px; right: -30px; animation-delay: -4s; }
+.blob-c { width: 200px; height: 200px; background: #4facfe; opacity: 0.08; top: 40%; left: 60%; animation-delay: -6s; }
 
 /* 顶栏 */
 .topbar {
-  background: #fff;
+  background: rgba(255,255,255,0.7);
+  backdrop-filter: blur(16px);
   padding: 0.9rem 2rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 16px rgba(0,0,0,0.06);
   position: sticky;
   top: 0;
   z-index: 10;
+  border-bottom: 1px solid rgba(255,255,255,0.5);
 }
 .brand { display: flex; align-items: center; gap: 0.6rem; font-weight: 800; font-size: 1.15rem; cursor: pointer; }
 .brand-logo {
@@ -199,17 +218,19 @@ onMounted(animateNumbers)
 }
 .stat-card {
   --c: var(--primary);
-  background: #fff;
+  background: rgba(255,255,255,0.6);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.5);
   border-radius: 16px;
   padding: 1.3rem;
   display: flex;
   align-items: center;
   gap: 1rem;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 16px rgba(0,0,0,0.04);
   border-bottom: 3px solid transparent;
-  transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+  transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease, background 0.3s ease;
 }
-.stat-card:hover { transform: translateY(-5px); box-shadow: 0 14px 30px rgba(0,0,0,0.1); border-bottom-color: var(--c); }
+.stat-card:hover { transform: translateY(-5px); background: rgba(255,255,255,0.8); box-shadow: 0 14px 30px rgba(0,0,0,0.1); border-bottom-color: var(--c); }
 .stat-icon {
   width: 48px; height: 48px;
   border-radius: 12px;
@@ -230,10 +251,12 @@ onMounted(animateNumbers)
   gap: 1.2rem;
 }
 .panel {
-  background: #fff;
+  background: rgba(255,255,255,0.6);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.5);
   border-radius: 16px;
   padding: 1.5rem;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 16px rgba(0,0,0,0.04);
 }
 .panel h3 { font-size: 1.05rem; margin-bottom: 1.1rem; color: #2d3748; }
 
@@ -252,13 +275,13 @@ onMounted(animateNumbers)
 .task {
   display: flex; align-items: center; gap: 0.6rem;
   padding: 0.55rem 0.8rem;
-  background: #f7fafc;
+  background: rgba(255,255,255,0.5);
   border-radius: 10px;
   font-size: 0.88rem;
   color: #4a5568;
   transition: transform 0.2s ease, background 0.2s ease;
 }
-.task:hover { transform: translateX(4px); background: #edf2f7; }
+.task:hover { transform: translateX(4px); background: rgba(255,255,255,0.7); }
 .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .task.done .dot { background: #43e97b; }
 .task.doing .dot { background: #4facfe; animation: pulse 1.6s ease infinite; }
@@ -292,8 +315,9 @@ onMounted(animateNumbers)
 .quick-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
 .quick {
   --c: var(--primary);
-  border: 1px solid #e2e8f0;
-  background: #fff;
+  border: 1px solid rgba(226,232,240,0.6);
+  background: rgba(255,255,255,0.5);
+  backdrop-filter: blur(8px);
   border-radius: 12px;
   padding: 0.9rem;
   text-align: left;

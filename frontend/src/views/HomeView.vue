@@ -69,25 +69,42 @@ onUnmounted(() => window.clearTimeout(timer))
         </div>
       </div>
 
-      <!-- 功能卡片 -->
-      <div class="features">
-        <div
-          v-for="(f, i) in features"
-          :key="f.title"
-          class="feature-card anim-fade-up"
-          :style="{ animationDelay: `${0.5 + i * 0.1}s`, '--card-color': f.color }"
-          @click="router.push(f.path)"
-        >
-          <div class="feature-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path :d="f.icon" />
-            </svg>
-          </div>
-          <h3>{{ f.title }}</h3>
-          <p>{{ f.desc }}</p>
-          <span class="arrow">→</span>
+      <!-- 功能流程 -->
+      <section class="flow-section">
+        <div class="flow-header anim-fade-up">
+          <span class="flow-label">FIVE CORE MODULES</span>
+          <h2>一站式求职工作流</h2>
         </div>
-      </div>
+
+        <div class="flow-track">
+          <!-- 连接线 -->
+          <div class="flow-line"></div>
+          <div class="flow-line-fill"></div>
+
+          <!-- 步骤节点 -->
+          <div
+            v-for="(f, i) in features"
+            :key="f.title"
+            class="flow-step anim-fade-up"
+            :style="{ animationDelay: `${0.5 + i * 0.12}s`, '--step-color': f.color }"
+            @click="router.push(f.path)"
+          >
+            <div class="step-node">
+              <span class="step-num">{{ String(i + 1).padStart(2, '0') }}</span>
+              <div class="step-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path :d="f.icon" />
+                </svg>
+              </div>
+              <div class="step-ring"></div>
+            </div>
+            <div class="step-info">
+              <h3>{{ f.title }}</h3>
+              <p>{{ f.desc }}</p>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   </div>
 </template>
@@ -179,61 +196,161 @@ onUnmounted(() => window.clearTimeout(timer))
 }
 .btn.ghost:hover { background: rgba(255,255,255,0.28); transform: translateY(-3px); }
 
-/* 功能卡片 */
-.features {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1.2rem;
+/* 功能流程 */
+.flow-section { margin-top: 1rem; }
+.flow-header { text-align: center; color: #fff; margin-bottom: 3rem; }
+.flow-label {
+  font-size: 0.75rem;
+  letter-spacing: 4px;
+  opacity: 0.7;
+  display: block;
+  margin-bottom: 0.5rem;
 }
-.feature-card {
+.flow-header h2 { font-size: 1.8rem; font-weight: 700; }
+
+.flow-track {
   position: relative;
-  background: rgba(255,255,255,0.95);
-  border-radius: 18px;
-  padding: 1.6rem 1.3rem;
-  cursor: pointer;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-  overflow: hidden;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 0 1rem;
 }
-.feature-card::before {
-  content: '';
+/* 连接线 */
+.flow-line {
   position: absolute;
-  top: 0; left: 0; right: 0;
-  height: 4px;
-  background: var(--card-color);
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform 0.3s ease;
+  top: 32px;
+  left: 8%;
+  right: 8%;
+  height: 3px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 2px;
+  z-index: 0;
 }
-.feature-card:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 18px 40px rgba(0,0,0,0.18);
+.flow-line-fill {
+  position: absolute;
+  top: 32px;
+  left: 8%;
+  width: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #667eea, #764ba2, #f093fb, #4facfe, #43e97b);
+  border-radius: 2px;
+  z-index: 1;
+  animation: drawLine 2s ease 0.3s forwards;
 }
-.feature-card:hover::before { transform: scaleX(1); }
-.feature-icon {
-  width: 52px;
-  height: 52px;
-  border-radius: 14px;
+@keyframes drawLine { to { width: 84%; } }
+
+/* 步骤节点 */
+.flow-step {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  text-align: center;
+}
+.step-node {
+  position: relative;
+  width: 64px;
+  height: 64px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--card-color);
-  color: #fff;
-  margin-bottom: 1rem;
-  transition: transform 0.3s ease;
+  margin-bottom: 1.1rem;
 }
-.feature-card:hover .feature-icon { transform: scale(1.12) rotate(-6deg); }
-.feature-icon svg { width: 26px; height: 26px; }
-.feature-card h3 { font-size: 1.1rem; margin-bottom: 0.4rem; color: #2d3748; }
-.feature-card p { font-size: 0.85rem; color: #718096; line-height: 1.5; }
-.arrow {
+.step-num {
   position: absolute;
-  right: 1.1rem;
-  bottom: 1rem;
-  color: var(--card-color);
-  font-weight: 700;
-  opacity: 0;
-  transform: translateX(-8px);
-  transition: all 0.3s ease;
+  top: -8px;
+  right: -8px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: #fff;
+  background: var(--step-color);
+  padding: 2px 6px;
+  border-radius: 8px;
+  z-index: 3;
 }
-.feature-card:hover .arrow { opacity: 1; transform: translateX(0); }
+.step-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.18);
+  border: 2px solid var(--step-color);
+  color: #fff;
+  transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  backdrop-filter: blur(8px);
+  z-index: 2;
+}
+.step-icon svg { width: 22px; height: 22px; }
+.step-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid var(--step-color);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  animation: ringPulse 2.5s ease-in-out infinite;
+}
+@keyframes ringPulse {
+  0%, 100% { transform: scale(1); opacity: 0; }
+  50% { transform: scale(1.3); opacity: 0.3; }
+}
+/* hover 效果 */
+.flow-step:hover .step-icon {
+  background: var(--step-color);
+  transform: scale(1.18);
+  box-shadow: 0 0 24px var(--step-color);
+}
+.flow-step:hover .step-ring { opacity: 0.5; animation: ringPulse 1s ease-in-out infinite; }
+.step-info { max-width: 150px; }
+.step-info h3 {
+  font-size: 1rem;
+  color: #fff;
+  margin-bottom: 0.3rem;
+  transition: color 0.3s ease;
+}
+.flow-step:hover .step-info h3 { color: var(--step-color); }
+.step-info p {
+  font-size: 0.78rem;
+  color: rgba(255,255,255,0.6);
+  line-height: 1.5;
+  transition: color 0.3s ease;
+}
+.flow-step:hover .step-info p { color: rgba(255,255,255,0.85); }
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .flow-track {
+    flex-direction: column;
+    gap: 0;
+    align-items: stretch;
+  }
+  .flow-line, .flow-line-fill {
+    top: 32px;
+    bottom: auto;
+    left: 32px;
+    right: auto;
+    width: 3px;
+    height: auto;
+  }
+  .flow-line { height: 100%; background: rgba(255,255,255,0.12); }
+  .flow-line-fill {
+    width: 3px;
+    height: 0;
+    animation: drawLineV 2s ease 0.3s forwards;
+  }
+  @keyframes drawLineV { to { height: calc(100% - 64px); } }
+  .flow-step {
+    flex-direction: row;
+    align-items: center;
+    text-align: left;
+    padding: 0.5rem 0 0.5rem 5rem;
+  }
+  .step-node { margin-bottom: 0; }
+  .step-info { max-width: none; }
+}
 </style>
