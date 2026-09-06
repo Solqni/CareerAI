@@ -1,0 +1,44 @@
+﻿# ===== Web 框架 =====
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+python-multipart==0.0.9
+
+# ===== 数据验证 & 配置 =====
+pydantic==2.9.2
+pydantic-settings==2.5.2
+
+# ===== 数据库 =====
+SQLAlchemy[asyncio]==2.0.35
+asyncpg==0.29.0
+pgvector==0.3.3
+
+# ===== 缓存 =====
+redis==5.0.8
+
+# ===== 安全 =====
+passlib[bcrypt]==1.7.4
+python-jose[cryptography]==3.3.0
+
+# ===== AI / LLM =====
+langchain==0.3.0
+langchain-core==0.3.0
+langchain-openai==0.2.0
+langgraph==0.2.22
+langchain-text-splitters==0.3.0
+langchain-community==0.3.0
+openai==1.45.0
+
+# ===== 文档解析 =====
+python-docx==1.1.2
+pypdf==4.3.1
+
+# ===== 工具 =====
+python-dotenv==1.0.1
+httpx==0.27.2
+
+# ===== 日志 =====
+loguru==0.7.2
+
+# ===== 测试 =====
+pytest==8.3.2
+pytest-asyncio==0.24.0

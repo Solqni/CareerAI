@@ -1,0 +1,565 @@
+
+
+
+
+
+
+
+AI求职与职业成长智能体软件需求规格说明书
+
+项目名称：AI求职与职业成长智能体（CareerAI）
+文档版本：V1.0
+编写日期：2026年9月
+技术路线：Python + FastAPI + LangChain（路线B）
+
+目录
+TOC \o "1-3" \h \z \u
+1. 引言 PAGEREF _Toc239495683 \h 1
+1.1 编写目的 PAGEREF _Toc239495684 \h 1
+1.2 项目定位 PAGEREF _Toc239495685 \h 1
+1.3 参考文献 PAGEREF _Toc239495686 \h 1
+2. 系统概述 PAGEREF _Toc239495687 \h 1
+2.1 产品愿景 PAGEREF _Toc239495688 \h 1
+2.2 功能模块总览 PAGEREF _Toc239495689 \h 2
+2.3 用户角色 PAGEREF _Toc239495690 \h 2
+2.4 核心业务流程 PAGEREF _Toc239495691 \h 2
+2.5 技术选型（路线B） PAGEREF _Toc239495692 \h 3
+3. 功能需求详述 PAGEREF _Toc239495693 \h 3
+3.1 用户与简历模块（M1） PAGEREF _Toc239495694 \h 3
+3.1.1 功能列表 PAGEREF _Toc239495695 \h 3
+3.1.2 简历解析用例 PAGEREF _Toc239495696 \h 4
+3.2 岗位分析模块（M2） PAGEREF _Toc239495697 \h 4
+3.2.1 功能列表 PAGEREF _Toc239495698 \h 4
+3.2.2 JD解析用例 PAGEREF _Toc239495699 \h 4
+3.3 能力匹配与规划模块（M3） PAGEREF _Toc239495700 \h 5
+3.3.1 功能列表 PAGEREF _Toc239495701 \h 5
+3.3.2 匹配度计算方式 PAGEREF _Toc239495702 \h 5
+3.4 简历优化模块（M4） PAGEREF _Toc239495703 \h 5
+3.5 面试准备模块（M5） PAGEREF _Toc239495704 \h 6
+4. 数据需求 PAGEREF _Toc239495705 \h 6
+4.1 核心数据表（共12张） PAGEREF _Toc239495706 \h 6
+4.2 Memory相关表 PAGEREF _Toc239495707 \h 7
+4.3 数据库说明 PAGEREF _Toc239495708 \h 8
+5. RAG知识库需求 PAGEREF _Toc239495709 \h 8
+5.1 RAG流程 PAGEREF _Toc239495710 \h 8
+5.2 RAG功能清单 PAGEREF _Toc239495711 \h 8
+5.3 RAG配置参数 PAGEREF _Toc239495712 \h 9
+6. Agent与Tool Calling需求 PAGEREF _Toc239495713 \h 9
+6.1 Agent工作流 PAGEREF _Toc239495714 \h 9
+6.2 Tool Calling（工具清单） PAGEREF _Toc239495715 \h 9
+6.3 Agent异常处理 PAGEREF _Toc239495716 \h 10
+7. Memory需求 PAGEREF _Toc239495717 \h 10
+7.1 短期记忆（必须） PAGEREF _Toc239495718 \h 10
+7.2 长期记忆（加分项） PAGEREF _Toc239495719 \h 10
+8. 外部接口需求 PAGEREF _Toc239495720 \h 10
+8.1 用户界面 PAGEREF _Toc239495721 \h 10
+8.2 软件接口 PAGEREF _Toc239495722 \h 11
+8.3 结构化输出 PAGEREF _Toc239495723 \h 11
+9. 非功能性需求 PAGEREF _Toc239495724 \h 11
+9.1 性能 PAGEREF _Toc239495725 \h 11
+9.2 安全性 PAGEREF _Toc239495726 \h 11
+9.3 可维护性 PAGEREF _Toc239495727 \h 12
+10. Git代码管理要求 PAGEREF _Toc239495728 \h 12
+11. Docker Compose部署要求 PAGEREF _Toc239495729 \h 12
+12. 软件测试要求 PAGEREF _Toc239495730 \h 13
+12.1 业务功能测试 PAGEREF _Toc239495731 \h 13
+12.2 RAG测试 PAGEREF _Toc239495732 \h 13
+12.3 Agent测试 PAGEREF _Toc239495733 \h 13
+13. 项目验收标准 PAGEREF _Toc239495734 \h 13
+
+
+1. 引言
+1.1 编写目的
+本需求规格说明书为"AI求职与职业成长智能体"（以下简称CareerAI）课程设计项目提供完整的需求描述。本项目属于《软件项目开发实战》课程——AI智能体应用开发方向，选题对应课程任务书推荐方向"AI求职与职业成长智能体"，旨在构建一个集简历解析、岗位分析、能力匹配、学习规划、面试准备和职业成长追踪于一体的AI智能体平台。系统定位于解决大学生求职者在求职与职业成长过程中面临的核心问题：
+信息不对称：求职者不了解目标岗位的技能要求，对行业需求缺乏认知；
+简历准备困难：不知道如何针对岗位优化简历，缺乏个性化指导；
+面试准备不足：缺乏针对性的面试题目和模拟练习机会。
+本项目采用课程任务书规定的技术路线B（Python + FastAPI + LangChain），通过真实接入大语言模型（LLM），实现RAG知识库、Tool Calling、Agent工作流等核心AI能力，满足课程设计各项验收指标。
+1.2 项目定位
+本项目定位为课程设计级别的AI智能体应用系统，强调核心功能的完整实现和AI能力的合理运用。系统采用B/S架构，后端使用FastAPI + LangChain，前端使用Vue 3，数据库使用PostgreSQL + pgvector，缓存使用Redis，LLM通过API调用（如DeepSeek），整体通过Docker Compose一键部署。
+1.3 参考文献
+《软件项目开发实战》课程设计任务书——AI智能体应用开发方向
+《软件工程导论》（第6版），张海藩，清华大学出版社
+2. 系统概述
+2.1 产品愿景
+产品名称：AI求职与职业成长智能体（CareerAI）
+目标用户：在校大学生（核心用户）、应届毕业生
+愿景：帮助求职者"看清自己、看懂岗位、做好规划、持续成长"。系统以AI智能体为核心驱动，通过简历解析、岗位分析、能力匹配、学习规划、面试准备、职业成长追踪等核心功能，为用户提供"评估→分析→规划→执行→成长"一站式求职与职业发展辅助服务。
+2.2 功能模块总览
+系统共包含五大功能模块，各模块协同运作：
+模块编号
+模块名称
+核心功能简介
+M1
+用户与简历模块
+用户注册登录、简历上传与解析、技能信息管理、能力画像展示
+M2
+岗位分析模块
+岗位描述(JD)解析、岗位要求提取、岗位知识库管理
+M3
+能力匹配与规划模块
+人岗匹配计算、差距分析、匹配报告生成、学习计划生成
+M4
+简历优化模块
+简历内容分析、优化建议生成、简历版本管理
+M5
+面试准备模块
+面试题生成、模拟面试对话、评估反馈
+2.3 用户角色
+序号
+角色
+核心需求
+1
+求职者（核心用户）
+简历解析、岗位匹配、差距分析、学习规划、面试准备
+2
+系统管理员
+用户管理、知识库维护、系统配置
+2.4 核心业务流程
+核心流程：简历上传 → 能力画像 → 岗位分析 → 匹配诊断 → 学习规划 → 面试准备 → 职业成长追踪
+用户上传简历 → 系统解析并构建能力画像 → 用户输入目标岗位JD → 系统解析岗位要求 → 能力差距诊断（Agent自动执行） → 生成匹配报告 → Agent生成学习计划 → 用户执行学习任务 → （支持简历优化 / 面试准备等附加服务）
+2.5 技术选型（路线B）
+根据课程任务书要求，本项目选择技术路线B（Python + LangChain）：
+类别
+技术选型
+说明
+编程语言
+Python 3.10+
+AI/LLM生态最丰富，LangChain原生支持
+Web框架
+FastAPI
+高性能异步框架，支持SSE流式输出
+数据验证
+Pydantic
+结构化数据校验，LLM输出解析
+ORM
+SQLAlchemy
+成熟稳定的Python ORM框架
+数据库
+PostgreSQL
+企业级关系型数据库
+向量数据库
+pgvector
+PostgreSQL扩展，与业务库统一管理
+缓存
+Redis
+会话缓存、热点数据缓存
+AI框架
+LangChain + LangGraph
+Agent编排、Tool Calling、RAG流程
+前端
+Vue 3 + TypeScript
+主流前端框架，生态完善
+LLM
+DeepSeek API
+国内可用，性价比高，支持Chat和Embedding
+容器化
+Docker + Docker Compose
+一键部署，环境一致
+3. 功能需求详述
+3.1 用户与简历模块（M1）
+3.1.1 功能列表
+功能编号
+功能名称
+描述
+操作角色
+UC-001
+用户注册与登录
+用户注册账号、登录系统，JWT Token认证
+所有用户
+UC-002
+简历上传与解析
+上传PDF/Word简历，调用LLM提取姓名、技能、教育背景、项目经历等结构化信息
+求职者
+UC-003
+技能信息管理
+用户手动增删改个人技能，标注熟练程度
+求职者
+UC-004
+能力画像展示
+以卡片和图表形式展示用户能力画像（技能、经验、教育背景等）
+求职者
+3.1.2 简历解析用例
+项目
+内容
+用例编号
+UC-002
+用例名称
+简历上传与解析
+参与者
+求职者
+优先级
+高
+描述
+求职者上传个人简历（PDF/Word），系统调用LLM提取结构化信息，构建初步能力画像
+前置条件
+求职者已登录系统
+基本流程
+1.进入"我的能力画像"页面；2.点击"上传简历"；3.选择PDF/Word文件；4.系统调用LLM解析；5.展示解析结果预览；6.用户确认或修正后保存
+异常流程
+文件格式不支持→提示"请上传PDF或Word格式"；LLM不可用→提示"AI服务暂时不可用"
+3.2 岗位分析模块（M2）
+3.2.1 功能列表
+功能编号
+功能名称
+描述
+操作角色
+UC-005
+JD文本解析
+用户粘贴岗位描述文本，调用LLM提取结构化岗位要求
+求职者
+UC-006
+岗位知识库
+管理员上传岗位相关文档，系统构建RAG知识库
+管理员
+UC-007
+岗位查询
+查看已解析的岗位信息，支持检索历史记录
+求职者
+3.2.2 JD解析用例
+项目
+内容
+用例编号
+UC-005
+用例名称
+JD解析
+参与者
+求职者
+优先级
+高
+描述
+求职者粘贴目标岗位JD文本，系统调用LLM提取岗位职责、必备技能、加分技能、学历要求等
+前置条件
+求职者已登录系统
+基本流程
+1.进入"岗位分析"页面；2.粘贴JD文本；3.点击"解析"；4.系统调用LLM提取结构化信息；5.展示解析结果；6.确认后保存为"目标岗位"
+异常流程
+JD内容过短→提示"JD内容不完整，请补充更多信息"
+3.3 能力匹配与规划模块（M3）
+3.3.1 功能列表
+功能编号
+功能名称
+描述
+操作角色
+UC-008
+人岗匹配计算
+Agent对比用户能力画像与岗位要求，计算匹配度评分
+求职者
+UC-009
+差距分析
+Agent识别用户与岗位之间的具体差距（缺失技能、经验不足等）
+求职者
+UC-010
+匹配报告生成
+生成可视化匹配报告（含匹配度评分、差距清单、建议）
+求职者
+UC-011
+学习计划生成
+Agent基于差距分析结果，生成个性化学习计划
+求职者
+UC-012
+学习任务管理
+查看学习任务列表、更新任务状态（待开始/进行中/已完成）
+求职者
+3.3.2 匹配度计算方式
+匹配度 = 技能匹配分（50%）+ 经验匹配分（30%）+ 学历匹配分（20%）。技能匹配：逐项对比用户技能与岗位要求技能，计算匹配率。经验匹配：对比用户项目经历与岗位要求年限和领域的相关性。最终由LLM基于以上数据给出综合评分和文字分析。
+3.4 简历优化模块（M4）
+Agent根据目标岗位要求，对用户简历内容进行分析并生成优化建议：
+关键词优化：识别简历中缺少的目标岗位关键词，建议补充；
+经历量化建议：建议将描述性经历改为量化成果表达；
+内容增强建议：针对能力短板，建议补充相关项目经验或证书描述。
+重要原则：Agent不得编造用户未提供的经历或技能，所有优化建议必须基于用户真实信息。实现方式：调用LLM，传入简历内容和岗位要求，使用Pydantic定义返回结构，让LLM返回结构化优化建议列表。
+3.5 面试准备模块（M5）
+Agent基于目标岗位和用户简历，提供面试准备服务：
+面试题生成：根据岗位要求，调用LLM生成针对性面试题（技术题、项目题、行为题）；
+模拟面试：Agent扮演面试官角色，与用户进行多轮文本对话面试；
+答案评估：对用户回答进行多维度评估（逻辑性、完整性、专业性）；
+反馈报告：每轮面试后生成评估报告（优点、不足、改进建议）。
+4. 数据需求
+4.1 核心数据表（共12张）
+根据课程任务书要求，核心业务数据表不少于10张，本项目设计12张：
+序号
+表名
+说明
+核心字段
+1
+user
+用户基础信息
+id, username, password_hash, email, role, created_at
+2
+resume
+简历信息
+id, user_id, raw_text, parsed_json, created_at, updated_at
+3
+user_skill
+用户技能
+id, user_id, skill_name, proficiency, source
+4
+user_experience
+用户经历
+id, user_id, type, title, description, date_range
+5
+job_analysis
+岗位解析结果
+id, user_id, jd_text, parsed_json, created_at
+6
+job_requirement
+岗位要求明细
+id, job_id, skill_name, requirement_level, category
+7
+match_report
+匹配报告
+id, user_id, job_id, total_score, summary, detail_json, created_at
+8
+gap_item
+差距项
+id, report_id, gap_type, skill_name, priority, suggested_action
+9
+learning_plan
+学习计划
+id, user_id, report_id, content_json, status, created_at
+10
+learning_task
+学习任务
+id, plan_id, task_name, description, resource_url, status, due_date
+11
+interview_session
+面试会话
+id, user_id, job_id, status, created_at, finished_at
+12
+interview_qa
+面试问答记录
+id, session_id, question, answer, score, feedback
+4.2 Memory相关表
+为满足Agent多轮对话Memory要求，额外设计以下表：
+序号
+表名
+说明
+核心字段
+13
+conversation
+对话会话
+id, user_id, title, agent_type, created_at
+14
+message
+对话消息
+id, conversation_id, role, content, tool_calls, created_at
+15
+knowledge_document
+知识库文档
+id, title, file_type, content, chunk_count, uploaded_at
+16
+document_chunk
+文档Chunk
+id, doc_id, chunk_index, content, embedding_id, created_at
+4.3 数据库说明
+数据库使用PostgreSQL，向量存储使用pgvector扩展，embedding通过DeepSeek Embedding API生成；
+表13-16为Memory和RAG知识库支撑表，其中message表存储对话历史，支持Agent多轮上下文；
+document_chunk表存储RAG知识库的文档切片，与pgvector向量索引关联；
+所有核心业务表均需提交ER图，说明表间关系。
+5. RAG知识库需求
+5.1 RAG流程
+系统必须实现完整的RAG流程，满足课程任务书要求：
+原始文档 → 文档解析（支持PDF/Word/Markdown/TXT） → Chunk切分（Chunk Size可配置，合理设置Overlap） → Embedding（调用DeepSeek Embedding API） → 向量存储（pgvector） → 用户问题 → Query Embedding → 相似度检索（TopK可配置） → 构建上下文 → LLM生成回答
+5.2 RAG功能清单
+功能
+说明
+要求
+创建知识库
+管理员创建岗位知识库
+必须
+上传文档
+支持PDF/Word/Markdown/TXT格式
+至少支持1种
+文档解析
+使用LangChain文档加载器解析文档内容
+必须
+Chunk切分
+文本分割，Chunk Size和Overlap可配置
+必须
+Embedding
+调用DeepSeek Embedding API生成向量
+必须
+向量存储
+使用pgvector存储向量
+必须
+相似度检索
+基于余弦相似度检索TopK相关文档
+必须
+删除文档
+支持从知识库中删除文档
+必须
+知识库问答
+基于检索结果+LLM回答用户问题
+必须
+来源引用
+展示回答引用的文档来源
+建议
+5.3 RAG配置参数
+Chunk Size：建议500-1000字符，根据文档类型调整；
+Chunk Overlap：建议50-100字符，保证上下文连贯；
+TopK：默认返回5个最相似Chunk；
+相似度阈值：可配置最低相似度，过滤不相关结果。
+6. Agent与Tool Calling需求
+6.1 Agent工作流
+Agent必须实现真实的执行流程，不能是简单的"Prompt→LLM→Answer"模式：
+用户任务 → Agent理解任务 → 选择Tool → 执行Tool → 获得Observation → 判断任务是否完成 → 必要时继续调用Tool → 最终结果
+使用LangGraph编排Agent工作流，支持多步骤任务的状态管理和流程控制。Agent需能根据任务执行结果判断是否需要继续调用工具，并具备异常处理能力。
+6.2 Tool Calling（工具清单）
+Agent需实现不少于4个具有业务意义的Tool，真实连接数据库或RAG服务：
+工具名称
+功能说明
+连接方式
+parse_resume
+解析简历文本，调用LLM提取结构化信息并存储到数据库
+LLM API + DB
+parse_jd
+解析岗位描述，调用LLM提取岗位要求并存储到数据库
+LLM API + DB
+calculate_match
+查询用户技能和岗位要求，计算匹配度评分
+DB查询
+search_knowledge
+在RAG知识库中检索岗位相关知识和学习资源
+pgvector检索
+generate_plan
+基于差距分析结果，调用LLM生成学习计划并存储
+LLM API + DB
+generate_interview_q
+基于岗位要求，调用LLM生成面试题
+LLM API
+6.3 Agent异常处理
+Tool调用失败时，Agent应能重试或降级处理；
+LLM接口异常时，返回友好提示而非系统崩溃；
+Agent无法完成任务时，应明确告知用户原因和建议。
+7. Memory需求
+7.1 短期记忆（必须）
+支持基本多轮会话上下文：使用LangChain的ConversationBufferMemory，存储当前会话的对话历史；
+通过conversation和message表持久化对话记录，支持查看历史对话；
+Agent在每次对话中能引用之前的上下文信息。
+7.2 长期记忆（加分项）
+用户能力画像持久化：用户技能、经历、学习进度等数据长期保存；
+学习历史记录：用户过往的学习计划和完成情况；
+岗位偏好：用户浏览和匹配过的岗位记录。
+8. 外部接口需求
+8.1 用户界面
+前端采用Vue 3 + TypeScript，界面要求：
+仪表盘视图：首页展示能力画像概览、匹配度趋势、学习进度等关键指标；
+对话式交互：核心Agent交互采用聊天界面，支持多轮对话和流式输出；
+报告可视化：匹配报告使用雷达图、柱状图等图表展示；
+文件上传：支持简历PDF/Word上传、JD文本粘贴；
+响应式设计：适配PC端访问。
+8.2 软件接口
+LLM Chat API：DeepSeek Chat API，用于简历解析、JD分析、匹配分析、面试题生成等；
+LLM Embedding API：DeepSeek Embedding API，用于文本向量化；
+REST API：FastAPI提供RESTful接口，前端通过Axios调用；
+SSE流式输出：Agent分析过程和结果支持Server-Sent Events流式输出。
+8.3 结构化输出
+LLM返回的结构化数据使用Pydantic模型进行校验和解析（课程任务书建议项）；
+简历解析结果、JD解析结果、匹配报告、学习计划等均使用Pydantic定义数据模型。
+9. 非功能性需求
+9.1 性能
+Agent分析任务应在15秒内返回结果（含流式输出）；
+支持课程演示场景下的并发访问；
+合理设计Prompt和Token使用策略，控制调用成本。
+9.2 安全性
+LLM API Key通过环境变量配置，不得提交至代码仓库（任务书必须项）；
+用户密码使用bcrypt哈希存储；
+JWT Token认证，会话隔离；
+用户简历等敏感数据加密存储。
+9.3 可维护性
+日志记录：Agent调用链路、Tool调用、Token消耗等关键操作记录日志；
+模块化设计：后端按功能模块分层（router → service → repository），Agent、RAG、Tool等组件松耦合；
+配置管理：数据库连接、LLM API Key等通过环境变量或配置文件统一管理。
+10. Git代码管理要求
+根据课程任务书要求，项目必须使用Git进行版本管理：
+持续commit，保留清晰开发记录（不允许只在最后一次性提交）；
+建议上传到Gitee，所有成员加入仓库；
+每名成员应有实际Commit记录，用于判断个人贡献；
+建议使用Feature Branch分支管理（feature/user、feature/rag、feature/agent等）；
+Commit规范：feat/fix/refactor/docs/test等前缀标注。
+11. Docker Compose部署要求
+根据课程任务书要求，项目必须使用Docker Compose统一部署：
+docker-compose.yml包含服务：frontend（Vue 3）、backend（FastAPI）、postgres（PostgreSQL + pgvector）、redis（Redis）、agent-service（Agent服务）；
+必须提供：Dockerfile、docker-compose.yml、环境变量模板(.env.example)、初始化SQL、部署说明；
+推荐做到 docker compose up -d 一键启动所有服务；
+建议部署到云服务器，实现公网访问。
+12. 软件测试要求
+根据课程任务书要求，必须完成以下测试：
+12.1 业务功能测试
+用户注册登录、权限验证、简历上传解析、JD解析、匹配分析、学习计划管理、面试模拟等核心业务流程。
+12.2 RAG测试
+知识库中有答案的提问、无答案的提问、模糊问题、多文档问题、容易产生幻觉的问题。
+12.3 Agent测试
+单Tool任务、多Tool任务、Tool调用失败、参数错误、找不到数据、Agent无法完成任务、LLM接口异常。
+13. 项目验收标准
+以下验收标准与课程任务书要求完全对齐：
+类别
+具体要求
+要求级别
+项目类型
+具有真实业务场景的软件系统（非纯聊天页面）
+必须
+技术路线
+Python + FastAPI + LangChain（路线B）
+必须
+用户角色
+不少于2类（求职者、管理员）
+必须
+功能模块
+不少于5个一级功能模块
+必须
+业务流程
+至少1条完整业务流程，答辩现场完整演示
+必须
+数据库
+不少于12张核心业务表，提交ER图、表说明
+必须
+大模型调用
+真实接入LLM API，有合理Prompt设计
+必须
+结构化输出
+至少一个场景使用Pydantic结构化输出
+建议
+RAG知识库
+完整RAG流程：解析→切分→Embedding→检索→回答
+必须
+文档类型
+至少支持1种文档类型（PDF/Word/Markdown/TXT）
+必须
+Chunk切分
+实际实现切分，能说明Chunk Size和Overlap
+必须
+Embedding
+真实执行向量化（不可只存原文）
+必须
+Vector Store
+使用pgvector向量存储
+必须
+Retrieval
+实现向量检索，能说明TopK参数
+必须
+Tool Calling
+不少于3个业务Tool，真实连接数据库/API/RAG
+必须
+Agent
+存在真实Agent执行流程，能选择Tool并继续执行
+必须
+Memory
+支持基本多轮对话上下文
+必须
+Git
+使用Git管理，保留清晰提交记录
+必须
+Docker Compose
+容器化部署，docker compose up -d一键启动
+必须
+测试
+完成业务、RAG、Agent测试
+必须
+答辩
+现场演示完整业务流程 + Agent工作流 + 解释核心代码
+必须
+
+本需求规格说明书依据《软件项目开发实战》课程设计任务书编写，所有功能模块和技术指标均与任务书要求对齐。项目开发过程中可使用AI Coding工具辅助，但必须能够解释和验证代码。
+
