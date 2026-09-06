@@ -17,8 +17,8 @@ class JobOut(ORMBase):
 # ===== LLM 结构化输出 =====
 
 class ParsedJobRequirement(BaseModel):
-    skill_name: str = Field(description="技能名称")
-    requirement_level: str = Field(default="must", description="要求级别: must / plus")
+    skill_name: str | None = Field(default=None, description="技能名称")
+    requirement_level: str | None = Field(default="must", description="要求级别: must / plus")
     category: str | None = Field(default=None, description="分类: 技术 / 工具 / 领域 / 软技能")
 
 
