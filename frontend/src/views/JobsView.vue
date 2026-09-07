@@ -22,8 +22,6 @@ async function handleParse() {
     loading.value = false
   }
 }
-
-const levelLabel = (l: string) => ({ must: '必备', plus: '加分' }[l] || l)
 </script>
 
 <template>
