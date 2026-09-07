@@ -35,15 +35,22 @@ async def parse_job_endpoint(
     await db.execute(delete(JobRequirement).where(JobRequirement.job_id == job.id))
 
     for skill in parsed.required_skills:
+        if not skill.skill_name:
+            continue
         db.add(JobRequirement(
             job_id=job.id,
             skill_name=skill.skill_name,
-            requirement_level=skill.requirement_level,
+            requirement_level=skill.requirement_level or "must",
             category=skill.category,
         ))
 
     await db.commit()
-    await db.refresh(job)
+    # 重新查询并预加载 requirements，避免响应序列化时触发懒加载
+    job = await db.scalar(
+        select(JobAnalysis)
+        .where(JobAnalysis.id == job.id)
+        .options(selectinload(JobAnalysis.requirements))
+    )
     return job
 
 
@@ -88,6 +95,8 @@ async def delete_job(
 ):
     """岗位知识库：删除一条岗位分析记录。"""
     job = await _get_job_or_404(job_id, current_user, db)
+    # 先删除关联的需求项，避免 SQLite 外键置空触发 NOT NULL 约束
+    await db.execute(delete(JobRequirement).where(JobRequirement.job_id == job.id))
     await db.delete(job)
     await db.commit()
 

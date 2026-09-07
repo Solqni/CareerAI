@@ -1,6 +1,7 @@
 """LLM 解析服务：简历解析 + JD 解析。"""
 
 import json
+import re
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
@@ -58,15 +59,23 @@ JD_SYSTEM_PROMPT = """你是一位专业的岗位分析专家。请从以下岗�
 
 
 def _parse_json_response(text: str) -> dict:
-    """从 LLM 响应中提取 JSON，兼容 markdown 代码块包裹。"""
+    """从 LLM 响应中提取 JSON，兼容 markdown 代码块与前后说明文字。"""
     text = text.strip()
     if text.startswith("```"):
         lines = text.split("\n")
         lines = lines[1:] if lines[0].startswith("```") else lines
         if lines and lines[-1].startswith("```"):
             lines = lines[:-1]
-        text = "\n".join(lines)
-    return json.loads(text)
+        text = "\n".join(lines).strip()
+
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        # 兜底：截取文本中首个完整 JSON 对象，避免模型前后附加说明导致解析失败
+        match = re.search(r"\{.*\}", text, re.DOTALL)
+        if match:
+            return json.loads(match.group(0))
+        raise
 
 
 async def parse_resume(raw_text: str) -> ResumeParsedResult:
@@ -103,10 +112,21 @@ async def parse_jd(jd_text: str) -> JDParsedResult:
     content = response.content if isinstance(response.content, str) else str(response.content)
     data = _parse_json_response(content)
 
+    responsibilities = data.get("responsibilities") or []
+    if isinstance(responsibilities, str):
+        responsibilities = [responsibilities]
+
+    skills: list[ParsedJobRequirement] = []
+    for item in data.get("required_skills") or []:
+        if isinstance(item, str):
+            skills.append(ParsedJobRequirement(skill_name=item))
+        elif isinstance(item, dict):
+            skills.append(ParsedJobRequirement(**item))
+
     result = JDParsedResult(
         position_title=data.get("position_title"),
-        responsibilities=data.get("responsibilities", []),
-        required_skills=[ParsedJobRequirement(**s) for s in data.get("required_skills", [])],
+        responsibilities=responsibilities,
+        required_skills=skills,
         education_requirement=data.get("education_requirement"),
         experience_requirement=data.get("experience_requirement"),
         summary=data.get("summary"),
