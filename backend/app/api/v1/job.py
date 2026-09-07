@@ -17,7 +17,10 @@ async def parse_job_endpoint(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """解析 JD 文本，提取岗位要求。"""
+    """解析 JD 文本，提取岗位要求并入库。"""
+    if not payload.jd_text.strip():
+        raise HTTPException(status_code=400, detail="JD 内容为空")
+
     parsed: JDParsedResult = await parse_jd(payload.jd_text)
 
     job = JobAnalysis(

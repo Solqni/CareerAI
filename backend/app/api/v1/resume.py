@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,12 +25,14 @@ async def parse_resume_text(
     db: AsyncSession = Depends(get_db),
 ):
     """粘贴简历文本进行 AI 解析。"""
+    if not payload.raw_text.strip():
+        raise HTTPException(status_code=400, detail="简历内容为空")
     return await _do_parse_resume(current_user, payload.raw_text, db)
 
 
 @router.post("/upload", response_model=ResumeOut)
 async def upload_resume(
-    file: UploadFile,
+    file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
