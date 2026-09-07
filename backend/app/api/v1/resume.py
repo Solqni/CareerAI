@@ -1,10 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
 from app.models import Resume, User, UserExperience, UserSkill
-from app.schemas.resume import ResumeOut, ResumeParseRequest, ResumeParsedResult
+from app.schemas.resume import (
+    ProfileOut,
+    ResumeOut,
+    ResumeParseRequest,
+    ResumeParsedResult,
+    SkillCreate,
+    SkillOut,
+)
 from app.services.file_extract import extract_text
 from app.services.parsing import parse_resume
 
@@ -93,3 +100,127 @@ async def _do_parse_resume(
     await db.commit()
     await db.refresh(resume)
     return resume
+
+
+@router.get("/latest", response_model=ResumeOut)
+async def get_latest_resume(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """获取当前用户最近一次解析的简历。"""
+    resume = await db.scalar(
+        select(Resume)
+        .where(Resume.user_id == current_user.id)
+        .order_by(Resume.id.desc())
+        .limit(1)
+    )
+    if not resume:
+        raise HTTPException(status_code=404, detail="暂无简历记录")
+    return resume
+
+
+@router.get("/skills", response_model=list[SkillOut])
+async def list_skills(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """技能列表（含简历自动识别 + 手动添加）。"""
+    result = await db.scalars(
+        select(UserSkill).where(UserSkill.user_id == current_user.id).order_by(UserSkill.id)
+    )
+    return result.all()
+
+
+@router.post("/skills", response_model=SkillOut, status_code=201)
+async def add_skill(
+    payload: SkillCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """手动添加技能。"""
+    exists = await db.scalar(
+        select(UserSkill).where(
+            UserSkill.user_id == current_user.id,
+            UserSkill.skill_name == payload.skill_name,
+        )
+    )
+    if exists:
+        raise HTTPException(status_code=400, detail="该技能已存在")
+    skill = UserSkill(
+        user_id=current_user.id,
+        skill_name=payload.skill_name,
+        proficiency=payload.proficiency,
+        source="manual",
+    )
+    db.add(skill)
+    await db.commit()
+    await db.refresh(skill)
+    return skill
+
+
+@router.delete("/skills/{skill_id}", status_code=204)
+async def delete_skill(
+    skill_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """删除技能。"""
+    skill = await db.get(UserSkill, skill_id)
+    if not skill or skill.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="技能不存在")
+    await db.delete(skill)
+    await db.commit()
+
+
+@router.get("/profile", response_model=ProfileOut)
+async def get_profile(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """能力画像：最新简历解析结果 + 技能表合并。"""
+    skills = (await db.scalars(
+        select(UserSkill).where(UserSkill.user_id == current_user.id).order_by(UserSkill.id)
+    )).all()
+    resume = await db.scalar(
+        select(Resume)
+        .where(Resume.user_id == current_user.id)
+        .order_by(Resume.id.desc())
+        .limit(1)
+    )
+    parsed = resume.parsed_json if resume else None
+
+    # LLM 解析的 education 是 list[dict]（学校/学历/专业），这里拼成字符串以匹配 ProfileOut.education: str
+    education_str = None
+    edu_raw = (parsed or {}).get("education")
+    if edu_raw:
+        if isinstance(edu_raw, list) and edu_raw and isinstance(edu_raw[0], dict):
+            parts = [
+                " ".join(filter(None, [e.get("degree"), e.get("major")]))
+                for e in edu_raw
+                if e.get("degree") or e.get("major")
+            ]
+            education_str = " / ".join(parts) if parts else None
+        elif isinstance(edu_raw, str):
+            education_str = edu_raw
+
+    # LLM 解析的 experiences 是 list[dict]（含 type/title/description/date_range），这里转成字符串列表
+    exp_list: list[str] = []
+    exp_raw = (parsed or {}).get("experiences", [])
+    if exp_raw:
+        if exp_raw and isinstance(exp_raw[0], dict):
+            for e in exp_raw:
+                title = e.get("title") or ""
+                desc = e.get("description") or ""
+                exp_list.append(f"{title}：{desc}".strip("："))
+        else:
+            exp_list = list(exp_raw)
+
+    return ProfileOut(
+        username=current_user.username,
+        email=(parsed or {}).get("email") or current_user.email,
+        phone=(parsed or {}).get("phone"),
+        education=education_str,
+        skills=skills,
+        experiences=exp_list,
+        summary=(parsed or {}).get("summary") or "暂无简历数据，请先上传或解析简历",
+    )

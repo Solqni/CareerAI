@@ -56,3 +56,29 @@ class ResumeParsedResult(BaseModel):
     skills: list[ParsedSkill] = Field(default_factory=list)
     experiences: list[ParsedExperience] = Field(default_factory=list)
     summary: str | None = Field(default=None, description="个人概述")
+
+
+# ===== 技能 / 能力画像 CRUD =====
+
+class SkillCreate(BaseModel):
+    skill_name: str = Field(min_length=1, max_length=128)
+    proficiency: int = Field(default=3, ge=1, le=5)
+
+
+class SkillOut(ORMBase):
+    id: int
+    skill_name: str
+    proficiency: int
+    source: str
+
+
+class ProfileOut(BaseModel):
+    """能力画像：基本信息 + 技能 + 经历。"""
+
+    username: str
+    email: str | None = None
+    phone: str | None = None
+    education: str | None = None
+    skills: list[SkillOut] = []
+    experiences: list[str] = []
+    summary: str | None = None
