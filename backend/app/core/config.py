@@ -51,7 +51,7 @@ class Settings(BaseSettings):
     DEEPSEEK_CHAT_MODEL: str = "deepseek-chat"
     DEEPSEEK_EMBEDDING_MODEL: str = "deepseek-embed"
     LLM_TEMPERATURE: float = 0.3
-    LLM_TIMEOUT: int = 60
+    LLM_TIMEOUT: int = 120
 
     # RAG
     RAG_CHUNK_SIZE: int = 800

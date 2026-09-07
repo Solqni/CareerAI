@@ -31,10 +31,12 @@ async def parse_job_endpoint(
     await db.execute(delete(JobRequirement).where(JobRequirement.job_id == job.id))
 
     for skill in parsed.required_skills:
+        if not skill.skill_name:
+            continue
         db.add(JobRequirement(
             job_id=job.id,
             skill_name=skill.skill_name,
-            requirement_level=skill.requirement_level,
+            requirement_level=skill.requirement_level or "must",
             category=skill.category,
         ))
 
