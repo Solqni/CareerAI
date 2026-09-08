@@ -110,6 +110,24 @@ onMounted(() => setTimeout(() => (shown.value = true), 400))
           </div>
         </div>
       </div>
+    <!-- 下一步导航：能力匹配完成后，引导进入面试准备 -->
+      <div class="next-step anim-fade-up anim-delay-4">
+        <div class="next-step-card">
+          <div class="next-step-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            </svg>
+          </div>
+          <div class="next-step-info">
+            <strong>下一步：面试准备</strong>
+            <p>AI 模拟面试官，针对差距进行多轮对话练习</p>
+          </div>
+          <button class="btn btn-outline" @click="router.push('/interview')">
+            前往面试准备
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </button>
+        </div>
+      </div>
     </div>
     </div>
   </div>
@@ -236,4 +254,43 @@ onMounted(() => setTimeout(() => (shown.value = true), 400))
   .score-card { flex-direction: column; text-align: center; }
   .panels { grid-template-columns: 1fr; }
 }
+
+/* 下一步导航 */
+.next-step { margin-top: 1.8rem; }
+.next-step-card {
+  display: flex; align-items: center; gap: 1rem;
+  padding: 1.2rem 1.4rem;
+  background: linear-gradient(135deg, #f0fdf4, #e0f2fe);
+  border: 1px solid #b7ebd0;
+  border-radius: 14px;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+.next-step-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(67,233,123,0.12); }
+.next-step-icon {
+  width: 44px; height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #43e97b, #4facfe);
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.next-step-icon svg { width: 22px; height: 22px; }
+.next-step-info { flex: 1; }
+.next-step-info strong { display: block; font-size: 0.95rem; color: #1a202c; margin-bottom: 0.15rem; }
+.next-step-info p { font-size: 0.82rem; color: #718096; }
+.btn-outline {
+  padding: 0.6rem 1.2rem;
+  background: transparent;
+  color: #43e97b;
+  border: 1.5px solid #43e97b;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+.btn-outline:hover { background: #43e97b; color: #fff; }
+.btn-outline svg { width: 16px; height: 16px; }
 </style>
