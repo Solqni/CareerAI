@@ -2,7 +2,7 @@ import api from './index'
 
 /** 粘贴文本解析简历 */
 export function parseResumeText(raw_text: string) {
-  return api.post('/resume/parse', { raw_text })
+  return api.post('/resume/parse', { raw_text }, { timeout: 120000 })
 }
 
 /** 上传文件解析简历 */
