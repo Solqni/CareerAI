@@ -128,20 +128,20 @@ async function handleParse() {
         </div>
       </div>
 
-      <!-- 下一步导航：岗位分析完成后，引导进入简历解析或匹配 -->
+      <!-- 下一步导航：岗位分析完成后，引导进入能力匹配 -->
       <div v-if="result" class="next-step anim-fade-up">
         <div class="next-step-card">
           <div class="next-step-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM8 13h8M8 17h8M8 9h2" />
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
             </svg>
           </div>
           <div class="next-step-info">
-            <strong>下一步：查看你的简历画像</strong>
-            <p>对比简历技能与岗位要求，发现差距</p>
+            <strong>下一步：能力匹配</strong>
+            <p>对比简历技能与岗位要求，生成差距报告</p>
           </div>
-          <button class="btn btn-outline" @click="router.push('/resume')">
-            前往简历解析
+          <button class="btn btn-outline" @click="router.push('/match')">
+            前往能力匹配
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
           </button>
         </div>
