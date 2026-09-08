@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { parseJobDescription } from '@/api/job'
 import BackButton from '@/components/BackButton.vue'
+
+const router = useRouter()
 
 const jdText = ref('')
 const loading = ref(false)
@@ -122,6 +125,25 @@ async function handleParse() {
         <div class="req-row">
           <span v-if="result.education_requirement"><strong>学历：</strong>{{ result.education_requirement }}</span>
           <span v-if="result.experience_requirement"><strong>经验：</strong>{{ result.experience_requirement }}</span>
+        </div>
+      </div>
+
+      <!-- 下一步导航：岗位分析完成后，引导进入简历解析或匹配 -->
+      <div v-if="result" class="next-step anim-fade-up">
+        <div class="next-step-card">
+          <div class="next-step-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM8 13h8M8 17h8M8 9h2" />
+            </svg>
+          </div>
+          <div class="next-step-info">
+            <strong>下一步：查看你的简历画像</strong>
+            <p>对比简历技能与岗位要求，发现差距</p>
+          </div>
+          <button class="btn btn-outline" @click="router.push('/resume')">
+            前往简历解析
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </button>
         </div>
       </div>
     </div>
@@ -318,4 +340,43 @@ async function handleParse() {
 /* 任职要求 */
 .req-row { display: flex; flex-wrap: wrap; gap: 1.5rem; font-size: 0.9rem; color: #2d3748; }
 .req-row strong { color: #764ba2; }
+
+/* 下一步导航 */
+.next-step { margin-top: 1.8rem; }
+.next-step-card {
+  display: flex; align-items: center; gap: 1rem;
+  padding: 1.2rem 1.4rem;
+  background: linear-gradient(135deg, #eef2ff, #f3e8ff);
+  border: 1px solid #d4d9fc;
+  border-radius: 14px;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+.next-step-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(102,126,234,0.12); }
+.next-step-icon {
+  width: 44px; height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.next-step-icon svg { width: 22px; height: 22px; }
+.next-step-info { flex: 1; }
+.next-step-info strong { display: block; font-size: 0.95rem; color: #1a202c; margin-bottom: 0.15rem; }
+.next-step-info p { font-size: 0.82rem; color: #718096; }
+.btn-outline {
+  padding: 0.6rem 1.2rem;
+  background: transparent;
+  color: #667eea;
+  border: 1.5px solid #667eea;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+.btn-outline:hover { background: #667eea; color: #fff; }
+.btn-outline svg { width: 16px; height: 16px; }
 </style>
