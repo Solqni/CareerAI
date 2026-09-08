@@ -1,4 +1,6 @@
-﻿from sqlalchemy import JSON, ForeignKey, Integer, String, Text
+﻿from datetime import datetime
+
+from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -28,6 +30,9 @@ class KnowledgeDocument(Base):
     file_type: Mapped[str] = mapped_column(String(32))
     content: Mapped[str] = mapped_column(Text)
     chunk_count: Mapped[int] = mapped_column(Integer, default=0)
+    uploaded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
 
 class DocumentChunk(Base):
