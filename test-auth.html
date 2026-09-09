@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>认证功能测试</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; }
+        input { padding: 8px; margin: 5px; }
+        pre { background: #f5f5f5; padding: 10px; border-radius: 3px; }
+        .success { color: green; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <h1>CareerAI 认证功能测试</h1>
+
+    <div class="test-section">
+        <h2>1. 用户注册测试</h2>
+        <input type="text" id="reg-username" placeholder="用户名" value="testuser2">
+        <input type="password" id="reg-password" placeholder="密码" value="testpass123">
+        <input type="email" id="reg-email" placeholder="邮箱" value="test2@example.com">
+        <select id="reg-role">
+            <option value="user">普通用户</option>
+            <option value="admin">管理员</option>
+        </select>
+        <button onclick="registerUser()">注册</button>
+        <pre id="register-result"></pre>
+    </div>
+
+    <div class="test-section">
+        <h2>2. 用户登录测试</h2>
+        <input type="text" id="login-username" placeholder="用户名" value="newuser">
+        <input type="password" id="login-password" placeholder="密码" value="newpass123">
+        <button onclick="loginUser()">登录</button>
+        <pre id="login-result"></pre>
+    </div>
+
+    <div class="test-section">
+        <h2>3. 获取用户信息测试</h2>
+        <button onclick="getUserInfo()">获取用户信息</button>
+        <pre id="userinfo-result"></pre>
+    </div>
+
+    <div class="test-section">
+        <h2>4. 测试访问受保护路由</h2>
+        <button onclick="testProtectedRoute()">测试Dashboard访问</button>
+        <pre id="protected-result"></pre>
+    </div>
+
+    <script>
+        // 存储token
+        let token = localStorage.getItem('access_token');
+
+        async function registerUser() {
+            const username = document.getElementById('reg-username').value;
+            const password = document.getElementById('reg-password').value;
+            const email = document.getElementById('reg-email').value;
+            const role = document.getElementById('reg-role').value;
+
+            try {
+                const response = await fetch('/api/v1/auth/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password, email, role })
+                });
+
+                const result = await response.json();
+                const resultEl = document.getElementById('register-result');
+
+                if (response.ok) {
+                    token = result.access_token;
+                    localStorage.setItem('access_token', token);
+                    resultEl.innerHTML = `<span class="success">注册成功!</span>\n${JSON.stringify(result, null, 2)}`;
+                } else {
+                    resultEl.innerHTML = `<span class="error">注册失败: ${result.detail}</span>`;
+                }
+            } catch (error) {
+                document.getElementById('register-result').innerHTML = `<span class="error">错误: ${error.message}</span>`;
+            }
+        }
+
+        async function loginUser() {
+            const username = document.getElementById('login-username').value;
+            const password = document.getElementById('login-password').value;
+
+            try {
+                const response = await fetch('/api/v1/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const result = await response.json();
+                const resultEl = document.getElementById('login-result');
+
+                if (response.ok) {
+                    token = result.access_token;
+                    localStorage.setItem('access_token', token);
+                    resultEl.innerHTML = `<span class="success">登录成功!</span>\n${JSON.stringify(result, null, 2)}`;
+                } else {
+                    resultEl.innerHTML = `<span class="error">登录失败: ${result.detail}</span>`;
+                }
+            } catch (error) {
+                document.getElementById('login-result').innerHTML = `<span class="error">错误: ${error.message}</span>`;
+            }
+        }
+
+        async function getUserInfo() {
+            try {
+                const response = await fetch('/api/v1/auth/me', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                const result = await response.json();
+                const resultEl = document.getElementById('userinfo-result');
+
+                if (response.ok) {
+                    resultEl.innerHTML = `<span class="success">获取成功!</span>\n${JSON.stringify(result, null, 2)}`;
+                } else {
+                    resultEl.innerHTML = `<span class="error">获取失败: ${result.detail}</span>`;
+                }
+            } catch (error) {
+                document.getElementById('userinfo-result').innerHTML = `<span class="error">错误: ${error.message}</span>`;
+            }
+        }
+
+        function testProtectedRoute() {
+            // 简单的测试 - 在实际应用中，路由守卫会处理这个
+            if (token) {
+                document.getElementById('protected-result').innerHTML = '<span class="success">已登录，可以访问Dashboard</span>';
+            } else {
+                document.getElementById('protected-result').innerHTML = '<span class="error">未登录，将被重定向到登录页面</span>';
+            }
+        }
+    </script>
+</body>
+</html>

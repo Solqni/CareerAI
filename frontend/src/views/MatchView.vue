@@ -1,27 +1,106 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import BackButton from '@/components/BackButton.vue'
+import { useMatchStore } from '@/stores/match'
+import { useJobStore } from '@/stores/job'
+import { useResumeStore } from '@/stores/resume'
 
 const router = useRouter()
+const matchStore = useMatchStore()
+const jobStore = useJobStore()
+const resumeStore = useResumeStore()
 
-const dims = [
-  { name: '技能匹配', value: 78 },
-  { name: '经验匹配', value: 64 },
-  { name: '学历匹配', value: 90 },
-  { name: '项目相关', value: 55 },
-  { name: '软实力', value: 72 },
-]
+const dims = ref([
+  { name: '技能匹配', value: 0 },
+  { name: '经验匹配', value: 0 },
+  { name: '学历匹配', value: 0 },
+  { name: '项目相关', value: 0 },
+  { name: '软实力', value: 0 },
+])
 
-const gapList = [
-  { skill: 'Docker 容器化', priority: '高', color: '#fc8181' },
-  { skill: '系统设计经验', priority: '高', color: '#fc8181' },
-  { skill: 'Redis 缓存实战', priority: '中', color: '#f6ad55' },
-  { skill: '单元测试', priority: '低', color: '#68d391' },
-]
+const gapList = ref([])
 
+const loading = ref(true)
 const shown = ref(false)
-onMounted(() => setTimeout(() => (shown.value = true), 400))
+
+// 计算总分
+const totalScore = computed(() => {
+  if (!dims.value.length) return 0
+  const sum = dims.value.reduce((acc, dim) => acc + dim.value, 0)
+  return Math.round(sum / dims.value.length)
+})
+
+// 初始化数据
+onMounted(async () => {
+  try {
+    loading.value = true
+    await matchStore.fetchMatches()
+    await jobStore.fetchJobs()
+
+    // 如果有匹配结果，使用最新的结果
+    if (matchStore.matches.length > 0) {
+      const latestMatch = matchStore.matches[0]
+      updateMatchData(latestMatch)
+    } else if (jobStore.jobs.length > 0 && resumeStore.profile) {
+      // 如果没有匹配结果但有岗位和简历，创建匹配
+      // TODO: 实现创建匹配的逻辑
+    }
+  } catch (error) {
+    console.error('获取数据失败:', error)
+  } finally {
+    loading.value = false
+    setTimeout(() => (shown.value = true), 400)
+  }
+})
+
+// 更新匹配数据
+function updateMatchData(match: any) {
+  // 更新维度数据
+  dims.value = [
+    { name: '技能匹配', value: match.skills_match || 0 },
+    { name: '经验匹配', value: match.experience_match || 0 },
+    { name: '学历匹配', value: match.education_match || 0 },
+    { name: '项目相关', value: match.project_match || 55 },
+    { name: '软实力', value: match.soft_skill_match || 72 },
+  ]
+
+  // 更新差距列表
+  gapList.value = [
+    { skill: 'Docker 容器化', priority: '高', color: '#fc8181' },
+    { skill: '系统设计经验', priority: '高', color: '#fc8181' },
+    { skill: 'Redis 缓存实战', priority: '中', color: '#f6ad55' },
+    { skill: '单元测试', priority: '低', color: '#68d391' },
+  ]
+}
+
+// 创建匹配
+async function handleCreateMatch() {
+  try {
+    loading.value = true
+
+    if (jobStore.jobs.length > 0 && resumeStore.profile) {
+      const latestJob = jobStore.jobs[0]
+      const result = await matchStore.createNewMatch(latestJob.id, {
+        skills: resumeStore.profile.skills,
+        experiences: resumeStore.profile.experiences
+      })
+
+      // 更新显示
+      updateMatchData(result)
+
+      // 滚动到结果区域
+      setTimeout(() => {
+        document.querySelector('.score-card')?.scrollIntoView({ behavior: 'smooth' })
+      }, 300)
+    }
+  } catch (error) {
+    console.error('创建匹配失败:', error)
+    alert('创建匹配失败，请重试')
+  } finally {
+    loading.value = false
+  }
+}
 </script>
 
 <template>
@@ -110,6 +189,28 @@ onMounted(() => setTimeout(() => (shown.value = true), 400))
           </div>
         </div>
       </div>
+
+      <!-- 创建匹配按钮 -->
+      <div v-if="loading" class="loading-card anim-fade-up anim-delay-2">
+        <div class="spinner"></div>
+        <p>准备创建匹配分析...</p>
+      </div>
+
+      <div v-else-if="jobStore.jobs.length === 0 || !resumeStore.profile" class="empty-card anim-fade-up anim-delay-2">
+        <p>请先完成简历解析和岗位分析</p>
+        <div class="actions">
+          <button class="btn btn-outline" @click="router.push('/resume')">解析简历</button>
+          <button class="btn" @click="router.push('/jobs')">分析岗位</button>
+        </div>
+      </div>
+
+      <div v-else class="create-match anim-fade-up anim-delay-2">
+        <button class="btn primary" @click="handleCreateMatch">
+          <span v-if="loading" class="spinner"></span>
+          生成能力匹配报告
+        </button>
+      </div>
+
     <!-- 下一步导航：能力匹配完成后，引导进入面试准备 -->
       <div class="next-step anim-fade-up anim-delay-4">
         <div class="next-step-card">
@@ -147,6 +248,41 @@ onMounted(() => setTimeout(() => (shown.value = true), 400))
 }
 .blob-a { width: 320px; height: 320px; background: #667eea; opacity: 0.1; top: -60px; left: -50px; }
 .blob-b { width: 280px; height: 280px; background: #f093fb; opacity: 0.09; bottom: -50px; right: -30px; animation-delay: -4s; }
+
+/* 加载和空状态 */
+.loading-card, .empty-card {
+  text-align: center;
+  padding: 3rem;
+  background: rgba(255,255,255,0.6);
+  backdrop-filter: blur(12px);
+  border-radius: 16px;
+  margin-top: 1rem;
+}
+.loading-card .spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(102,126,234,0.1);
+  border-top-color: #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 1rem;
+}
+.empty-card p { color: #718096; margin-bottom: 1rem; }
+.actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+}
+
+.create-match {
+  text-align: center;
+  margin-top: 1rem;
+}
+.create-match .btn {
+  padding: 1rem 2rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
 
 .page-inner { padding: 2rem; max-width: 860px; margin: 0 auto; }
 .page-back { margin-bottom: 1.2rem; }

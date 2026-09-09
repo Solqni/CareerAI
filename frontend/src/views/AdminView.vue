@@ -55,6 +55,7 @@ function handleLogout() {
       <nav>
         <button @click="router.push('/admin/jobs')">岗位管理</button>
         <button @click="router.push('/admin/rag')">RAG 知识库</button>
+        <button @click="router.push('/admin/settings')">系统设置</button>
         <button @click="handleLogout">退出登录</button>
       </nav>
     </header>
