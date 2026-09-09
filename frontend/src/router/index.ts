@@ -19,7 +19,27 @@ const router = createRouter({
       name: 'admin',
       component: () => import('@/views/AdminView.vue'),
       meta: { requiresAdmin: true },
-      beforeEnter: [checkAuth, checkRole]
+      beforeEnter: [checkAuth, checkRole],
+      children: [
+        {
+          path: 'jobs',
+          name: 'admin-jobs',
+          component: () => import('@/views/admin/AdminJobs.vue'),
+          meta: { requiresAdmin: true }
+        },
+        {
+          path: 'rag',
+          name: 'admin-rag',
+          component: () => import('@/views/admin/AdminRAG.vue'),
+          meta: { requiresAdmin: true }
+        },
+        {
+          path: 'settings',
+          name: 'admin-settings',
+          component: () => import('@/views/admin/AdminSettings.vue'),
+          meta: { requiresAdmin: true }
+        }
+      ]
     },
     { path: '/resume', name: 'resume', component: () => import('@/views/ResumeView.vue') },
     { path: '/jobs', name: 'jobs', component: () => import('@/views/JobsView.vue') },

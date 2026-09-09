@@ -15,7 +15,12 @@ async function handleLogin() {
   error.value = ''
   try {
     await auth.login(username.value, password.value)
-    router.push('/dashboard')
+    // 根据用户角色跳转到不同页面
+    if (auth.user?.role === 'admin') {
+      router.push('/admin')
+    } else {
+      router.push('/dashboard')
+    }
   } catch {
     error.value = '登录失败，请检查用户名和密码'
   } finally {
