@@ -1,9 +1,8 @@
 import { useAuthStore } from '@/stores/auth'
 
-const auth = useAuthStore()
-
 // 检查用户是否已登录
 export function checkAuth(_to: any, _from: any, next: any) {
+  const auth = useAuthStore()
   if (!auth.token) {
     // 未登录，跳转到登录页
     next('/login')
@@ -14,6 +13,7 @@ export function checkAuth(_to: any, _from: any, next: any) {
 
 // 检查用户角色
 export function checkRole(_to: any, _from: any, next: any) {
+  const auth = useAuthStore()
   if (!auth.user) {
     next('/login')
     return
@@ -30,6 +30,7 @@ export function checkRole(_to: any, _from: any, next: any) {
 
 // 初始化时检查用户状态
 export async function initializeAuth() {
+  const auth = useAuthStore()
   if (auth.token) {
     try {
       await auth.fetchUser()
