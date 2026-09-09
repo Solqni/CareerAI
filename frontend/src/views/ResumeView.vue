@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { parseResumeText, uploadResumeFile } from '@/api/resume'
 import BackButton from '@/components/BackButton.vue'
+import { useResumeStore } from '@/stores/resume'
 
 const router = useRouter()
+const resumeStore = useResumeStore()
 
 const resumeText = ref('')
 const loading = ref(false)
@@ -12,6 +14,7 @@ const errorMsg = ref('')
 const result = ref<any>(null)
 const fileName = ref('')
 const fileInput = ref<HTMLInputElement | null>(null)
+const editing = ref(false)
 
 async function handleParse() {
   if (!resumeText.value.trim()) return
@@ -19,8 +22,19 @@ async function handleParse() {
   errorMsg.value = ''
   result.value = null
   try {
-    const res = await parseResumeText(resumeText.value)
-    result.value = res.data.parsed_json
+    await resumeStore.parseResume(resumeText.value)
+    // 解析成功，显示用户数据
+    if (resumeStore.profile) {
+      result.value = {
+        name: resumeStore.profile.username,
+        email: resumeStore.profile.email,
+        phone: resumeStore.profile.phone,
+        summary: resumeStore.profile.summary,
+        skills: resumeStore.profile.skills,
+        experiences: resumeStore.profile.experiences,
+        education: resumeStore.profile.education
+      }
+    }
   } catch (e: any) {
     errorMsg.value = e.response?.data?.detail || e.message || '解析失败'
   } finally {
@@ -49,8 +63,19 @@ async function handleUpload(file: File) {
   errorMsg.value = ''
   result.value = null
   try {
-    const res = await uploadResumeFile(file)
-    result.value = res.data.parsed_json
+    await resumeStore.uploadFile(file)
+    // 上传成功，显示用户数据
+    if (resumeStore.profile) {
+      result.value = {
+        name: resumeStore.profile.username,
+        email: resumeStore.profile.email,
+        phone: resumeStore.profile.phone,
+        summary: resumeStore.profile.summary,
+        skills: resumeStore.profile.skills,
+        experiences: resumeStore.profile.experiences,
+        education: resumeStore.profile.education
+      }
+    }
   } catch (e: any) {
     errorMsg.value = e.response?.data?.detail || e.message || '上传解析失败'
   } finally {
@@ -60,6 +85,43 @@ async function handleUpload(file: File) {
 
 const proficiencyLabel = (p: number) => ['初学', '了解', '熟悉', '熟练', '精通'][Math.min(p - 1, 4)] || '熟悉'
 const typeLabel = (t: string) => ({ work: '工作经历', internship: '实习经历', project: '项目经历' }[t] || t)
+
+// 处理更新信息
+async function handleUpdate() {
+  loading.value = true
+  errorMsg.value = ''
+  try {
+    // TODO: 实现更新简历信息的API调用
+    // 暂时只是退出编辑模式
+    editing.value = false
+    // 这里应该调用API更新数据，然后刷新数据
+  } catch (e: any) {
+    errorMsg.value = e.response?.data?.detail || e.message || '更新失败'
+  } finally {
+    loading.value = false
+  }
+}
+
+// 初始化时获取已保存的简历数据
+onMounted(async () => {
+  try {
+    await resumeStore.fetchProfile()
+    // 如果已有简历数据，显示在页面上
+    if (resumeStore.profile && resumeStore.profile.skills) {
+      result.value = {
+        name: resumeStore.profile.username,
+        email: resumeStore.profile.email,
+        phone: resumeStore.profile.phone,
+        summary: resumeStore.profile.summary,
+        skills: resumeStore.profile.skills,
+        experiences: resumeStore.profile.experiences,
+        education: resumeStore.profile.education
+      }
+    }
+  } catch (err) {
+    console.error('获取简历信息失败:', err)
+  }
+})
 </script>
 
 <template>
@@ -100,7 +162,47 @@ const typeLabel = (t: string) => ({ work: '工作经历', internship: '实习经
 
     <div class="divider anim-fade-up anim-delay-2"><span>或粘贴简历文本</span></div>
 
-    <div class="editor-wrap anim-fade-up anim-delay-2">
+    <div v-if="!editing && result" class="result-section">
+      <div class="section-actions">
+        <button class="btn-outline" @click="editing = true">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+          </svg>
+          修改信息
+        </button>
+      </div>
+    </div>
+
+    <!-- 编辑模式 -->
+    <div v-if="editing" class="edit-section anim-fade-up">
+      <h4>编辑简历内容</h4>
+      <div class="edit-form">
+        <div class="form-group">
+          <label>基本信息</label>
+          <div class="info-edit">
+            <input v-model="result.name" placeholder="请输入姓名" />
+            <input v-model="result.email" placeholder="请输入邮箱" />
+            <input v-model="result.phone" placeholder="请输入电话" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>个人概述</label>
+          <textarea v-model="result.summary" placeholder="请输入个人概述"></textarea>
+        </div>
+
+        <div class="form-actions">
+          <button class="btn btn-secondary" @click="editing = false">取消</button>
+          <button class="btn" @click="handleUpdate">
+            <span v-if="loading" class="spinner"></span>
+            保存修改
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div v-else class="editor-wrap anim-fade-up anim-delay-2">
       <textarea v-model="resumeText" placeholder="在此粘贴你的简历内容...&#10;&#10;例如：姓名、教育背景、项目经历、技能清单等"></textarea>
       <div class="editor-meta">
         <span>{{ resumeText.length }} 字</span>
@@ -119,7 +221,16 @@ const typeLabel = (t: string) => ({ work: '工作经历', internship: '实习经
 
     <!-- 解析结果 -->
     <div v-if="result" class="result-card anim-fade-up">
-      <h3>解析结果</h3>
+      <div class="result-header">
+        <h3>简历信息</h3>
+        <button v-if="!editing" class="edit-btn" @click="editing = true">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+          </svg>
+          编辑
+        </button>
+      </div>
 
       <!-- 基本信息 -->
       <div v-if="result.name || result.email || result.phone" class="result-section">
@@ -437,4 +548,105 @@ const typeLabel = (t: string) => ({ work: '工作经历', internship: '实习经
 }
 .btn-outline:hover { background: #764ba2; color: #fff; }
 .btn-outline svg { width: 16px; height: 16px; }
+/* 编辑模式样式 */
+.result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid #edf2f7;
+}
+.result-header h3 { font-size: 1.2rem; color: #1a202c; }
+.edit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.edit-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(102,126,234,0.3); }
+
+.section-actions {
+  margin-bottom: 1rem;
+}
+
+.edit-section {
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+.edit-section h4 {
+  font-size: 1rem;
+  color: #2d3748;
+  margin-bottom: 1rem;
+}
+.edit-form .form-group {
+  margin-bottom: 1.2rem;
+}
+.edit-form label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #4a5568;
+  margin-bottom: 0.5rem;
+}
+.info-edit {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.8rem;
+}
+.info-edit input {
+  padding: 0.5rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  transition: border-color 0.2s ease;
+}
+.info-edit input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
+}
+.edit-form textarea {
+  width: 100%;
+  min-height: 100px;
+  padding: 0.8rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  resize: vertical;
+  transition: border-color 0.2s ease;
+}
+.edit-form textarea:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
+}
+.form-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  margin-top: 1.5rem;
+}
+.btn-secondary {
+  padding: 0.7rem 1.5rem;
+  background: #e2e8f0;
+  color: #4a5568;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.btn-secondary:hover { background: #cbd5e0; }
 </style>
