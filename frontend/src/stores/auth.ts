@@ -25,7 +25,7 @@ export const useAuthStore = defineStore('auth', () => {
       console.log('开始获取用户信息')
       user.value = await getMe()
       console.log('获取用户信息成功:', user.value?.username)
-    } catch (error) {
+    } catch (error: any) {
       console.error('获取用户信息失败:', error)
       console.error('错误详情:', error.message)
       user.value = null

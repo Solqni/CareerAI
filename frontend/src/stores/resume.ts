@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { getProfile, parseResumeText, uploadResumeFile, type Skill } from '@/api/resume'
+import { getProfile, parseResumeText, uploadResumeFile } from '@/api/resume'
 
 export const useResumeStore = defineStore('resume', () => {
   const profile = ref<any>(null)
@@ -57,7 +57,7 @@ export const useResumeStore = defineStore('resume', () => {
   }
 
   // 添加技能
-  async function addSkill(skill: { skill_name: string; proficiency: number }) {
+  async function addSkill(_skill: { skill_name: string; proficiency: number }) {
     try {
       loading.value = true
       error.value = ''
@@ -72,7 +72,7 @@ export const useResumeStore = defineStore('resume', () => {
   }
 
   // 删除技能
-  async function deleteSkill(skillId: number) {
+  async function deleteSkill(_skillId: number) {
     try {
       loading.value = true
       error.value = ''

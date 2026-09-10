@@ -2,10 +2,8 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import BackButton from '@/components/BackButton.vue'
-import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
-const auth = useAuthStore()
 
 const settings = ref({
   system: {
@@ -57,18 +55,9 @@ const fetchUsers = async () => {
   }
 }
 
-// 修改用户角色
-const changeUserRole = (userId: string, newRole: string) => {
-  // TODO: 实现修改用户角色功能
-  alert('修改用户角色功能开发中')
-}
-
-// 删除用户
-const deleteUser = (userId: string) => {
-  // TODO: 实现删除用户功能
-  if (confirm('确定要删除这个用户吗？')) {
-    alert('删除用户功能开发中')
-  }
+// 显示提示（模板中无法直接访问 window.alert）
+const showAlert = (message: string) => {
+  alert(message)
 }
 
 onMounted(() => {
@@ -191,7 +180,7 @@ onMounted(() => {
       <div class="settings-section anim-fade-up anim-delay-6">
         <div class="section-header">
           <h3>用户管理</h3>
-          <button class="add-user-btn" @click="alert('添加新用户功能开发中')">
+          <button class="add-user-btn" @click="showAlert('添加新用户功能开发中')">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="12" y1="5" x2="12" y2="19"></line>
               <line x1="5" y1="12" x2="19" y2="12"></line>
