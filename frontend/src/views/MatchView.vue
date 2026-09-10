@@ -1,244 +1,394 @@
 <script setup lang="ts">
-import { onMounted, ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
-import BackButton from '@/components/BackButton.vue'
-import { useMatchStore } from '@/stores/match'
-import { useJobStore } from '@/stores/job'
+import { ref, onMounted, computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useResumeStore } from '@/stores/resume'
+import { useJobStore } from '@/stores/job'
+import { useMatchStore } from '@/stores/match'
+import BackButton from '@/components/BackButton.vue'
+import { analyzeMatch } from '@/api/match'
 
 const router = useRouter()
-const matchStore = useMatchStore()
-const jobStore = useJobStore()
+const route = useRoute()
 const resumeStore = useResumeStore()
+const jobStore = useJobStore()
+const matchStore = useMatchStore()
 
-const dims = ref([
-  { name: '技能匹配', value: 0 },
-  { name: '经验匹配', value: 0 },
-  { name: '学历匹配', value: 0 },
-  { name: '项目相关', value: 0 },
-  { name: '软实力', value: 0 },
-])
+// 表单数据
+const resumeId = ref<number | null>(null)
+const jobId = ref<number | null>(null)
+const selectedResume = ref<any>(null)
+const selectedJob = ref<any>(null)
 
-const gapList = ref([])
+// 状态
+const loading = ref(false)
+const analyzing = ref(false)
+const error = ref('')
+const showForm = computed(() => !resumeId.value || !jobId.value)
 
-const loading = ref(true)
-const shown = ref(false)
+// 计算属性
+const currentMatch = computed(() => matchStore.currentMatch)
+const matchLevel = computed(() => matchStore.currentMatchLevel)
+const matchProgress = computed(() => matchStore.matchProgress)
+const matchBreakdown = computed(() => matchStore.matchBreakdown)
 
-// 计算总分
-const totalScore = computed(() => {
-  if (!dims.value.length) return 0
-  const sum = dims.value.reduce((acc, dim) => acc + dim.value, 0)
-  return Math.round(sum / dims.value.length)
+// 获取用户简历列表
+const userResumes = computed(() => {
+  // 这里应该从API获取用户的简历列表
+  return [] // 暂时返回空数组
 })
 
-// 初始化数据
-onMounted(async () => {
-  try {
-    loading.value = true
-    await matchStore.fetchMatches()
-    await jobStore.fetchJobs()
+// 获取用户岗位列表
+const userJobs = computed(() => {
+  return jobStore.jobs || []
+})
 
-    // 如果有匹配结果，使用最新的结果
-    if (matchStore.matches.length > 0) {
-      const latestMatch = matchStore.matches[0]
-      updateMatchData(latestMatch)
-    } else if (jobStore.jobs.length > 0 && resumeStore.profile) {
-      // 如果没有匹配结果但有岗位和简历，创建匹配
-      // TODO: 实现创建匹配的逻辑
-    }
-  } catch (error) {
-    console.error('获取数据失败:', error)
-  } finally {
-    loading.value = false
-    setTimeout(() => (shown.value = true), 400)
+// 初始化
+onMounted(async () => {
+  // 从路由参数获取ID
+  const { resumeId: paramResumeId, jobId: paramJobId } = route.params
+
+  if (paramResumeId && paramJobId) {
+    resumeId.value = Number(paramResumeId)
+    jobId.value = Number(paramJobId)
+
+    // 获取匹配详情
+    await loadMatchDetail()
+  } else {
+    // 获取用户数据
+    await Promise.all([
+      resumeStore.fetchProfile(),
+      jobStore.fetchJobs()
+    ])
   }
 })
 
-// 更新匹配数据
-function updateMatchData(match: any) {
-  // 更新维度数据
-  dims.value = [
-    { name: '技能匹配', value: match.skills_match || 0 },
-    { name: '经验匹配', value: match.experience_match || 0 },
-    { name: '学历匹配', value: match.education_match || 0 },
-    { name: '项目相关', value: match.project_match || 55 },
-    { name: '软实力', value: match.soft_skill_match || 72 },
-  ]
+// 加载匹配详情
+async function loadMatchDetail() {
+  if (!resumeId.value || !jobId.value) return
 
-  // 更新差距列表
-  gapList.value = [
-    { skill: 'Docker 容器化', priority: '高', color: '#fc8181' },
-    { skill: '系统设计经验', priority: '高', color: '#fc8181' },
-    { skill: 'Redis 缓存实战', priority: '中', color: '#f6ad55' },
-    { skill: '单元测试', priority: '低', color: '#68d391' },
-  ]
-}
-
-// 创建匹配
-async function handleCreateMatch() {
   try {
     loading.value = true
-
-    if (jobStore.jobs.length > 0 && resumeStore.profile) {
-      const latestJob = jobStore.jobs[0]
-      const result = await matchStore.createNewMatch(latestJob.id, {
-        skills: resumeStore.profile.skills,
-        experiences: resumeStore.profile.experiences
-      })
-
-      // 更新显示
-      updateMatchData(result)
-
-      // 滚动到结果区域
-      setTimeout(() => {
-        document.querySelector('.score-card')?.scrollIntoView({ behavior: 'smooth' })
-      }, 300)
-    }
-  } catch (error) {
-    console.error('创建匹配失败:', error)
-    alert('创建匹配失败，请重试')
+    await matchStore.loadMatchDetail(`match_${resumeId.value}_${jobId.value}`)
+  } catch (err: any) {
+    error.value = err.response?.data?.detail || '加载匹配详情失败'
+    console.error('加载匹配详情失败:', err)
   } finally {
     loading.value = false
+  }
+}
+
+// 开始分析匹配度
+async function startAnalysis() {
+  if (!resumeId.value || !jobId.value) {
+    error.value = '请选择简历和岗位'
+    return
+  }
+
+  try {
+    analyzing.value = true
+    error.value = ''
+
+    await matchStore.analyzeMatchData({
+      resume_id: resumeId.value,
+      job_id: jobId.value
+    })
+
+    // 跳转到结果页
+    router.push(`/match/result/${resumeId.value}/${jobId.value}`)
+  } catch (err: any) {
+    error.value = err.response?.data?.detail || '分析匹配度失败'
+    console.error('分析匹配度失败:', err)
+  } finally {
+    analyzing.value = false
+  }
+}
+
+// 选择简历
+function selectResume(resume: any) {
+  selectedResume.value = resume
+  resumeId.value = resume.id
+}
+
+// 选择岗位
+function selectJob(job: any) {
+  selectedJob.value = job
+  jobId.value = job.id
+}
+
+// 导航到结果页
+function viewResult() {
+  if (resumeId.value && jobId.value) {
+    router.push(`/match/result/${resumeId.value}/${jobId.value}`)
+  }
+}
+
+// 返回列表
+function goBack() {
+  router.push('/match')
+}
+
+// 获取匹配度总结
+function getMatchSummary(score: number) {
+  if (score >= 90) return '简历与岗位匹配度很高，建议直接投递'
+  if (score >= 70) return '简历与岗位匹配度良好，可以投递'
+  if (score >= 50) return '简历与岗位匹配度一般，建议优化后再投递'
+  return '简历与岗位匹配度较低，建议大幅优化后再投递'
+}
+
+// 获取差距类型标签
+function getGapTypeLabel(type: string) {
+  switch (type) {
+    case 'skill':
+      return '技能差距'
+    case 'experience':
+      return '经验差距'
+    case 'education':
+      return '教育差距'
+    default:
+      return '其他差距'
+  }
+}
+
+// 生成反馈
+function generateFeedback() {
+  if (currentMatch.value) {
+    router.push(`/match/feedback/${currentMatch.value.id}`)
   }
 }
 </script>
 
 <template>
-  <div class="page">
+  <div class="match-analysis">
     <div class="page-bg"></div>
     <div class="page-blob blob-a"></div>
     <div class="page-blob blob-b"></div>
-    <div class="page-inner">
-    <BackButton class="page-back" />
-    <div class="page-header anim-fade-up">
-      <div class="header-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-        </svg>
-      </div>
-      <div>
-        <h2>能力匹配</h2>
-        <p>Agent 自动对比能力画像与岗位要求，计算匹配度并生成差距报告</p>
-      </div>
-    </div>
 
-    <!-- 总分卡 -->
-    <div class="score-card anim-fade-up anim-delay-1">
-      <div class="score-ring">
-        <svg viewBox="0 0 120 120">
-          <circle cx="60" cy="60" r="52" fill="none" stroke="#edf2f7" stroke-width="10" />
-          <circle
-            class="ring-progress"
-            cx="60" cy="60" r="52"
-            fill="none"
-            stroke="url(#grad)"
-            stroke-width="10"
-            stroke-linecap="round"
-            :stroke-dasharray="2 * Math.PI * 52"
-            :stroke-dashoffset="shown ? 2 * Math.PI * 52 * (1 - 0.72) : 2 * Math.PI * 52"
-          />
-          <defs>
-            <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="#667eea" />
-              <stop offset="100%" stop-color="#f093fb" />
-            </linearGradient>
-          </defs>
-        </svg>
-        <div class="score-num">
-          <strong>72</strong>
-          <span>综合匹配度</span>
-        </div>
-      </div>
-      <div class="score-summary">
-        <h3>匹配诊断摘要</h3>
-        <p>你的技能基础与该岗位总体契合度较好，学历完全达标。主要差距集中在<strong>容器化部署</strong>与<strong>系统设计经验</strong>两方面，建议优先补齐。</p>
-        <button class="btn" @click="router.push('/dashboard')">生成学习计划 →</button>
-      </div>
-    </div>
-
-    <div class="panels">
-      <!-- 维度条形图 -->
-      <div class="panel anim-fade-up anim-delay-2">
-        <h3>维度分析</h3>
-        <div class="bars">
-          <div v-for="(d, i) in dims" :key="d.name" class="bar-row">
-            <span class="bar-label">{{ d.name }}</span>
-            <div class="bar-track">
-              <div
-                class="bar-fill"
-                :style="{
-                  width: shown ? d.value + '%' : '0%',
-                  transitionDelay: i * 0.12 + 's',
-                  background: `linear-gradient(90deg, #667eea, #f093fb)`,
-                }"
-              ></div>
-            </div>
-            <strong class="bar-val">{{ d.value }}</strong>
-          </div>
-        </div>
-      </div>
-
-      <!-- 差距清单 -->
-      <div class="panel anim-fade-up anim-delay-3">
-        <h3>差距清单</h3>
-        <div class="gaps">
-          <div v-for="(g, i) in gapList" :key="g.skill" class="gap-item" :style="{ animationDelay: 0.5 + i * 0.1 + 's' }">
-            <span class="prio" :style="{ background: g.color }">{{ g.priority }}</span>
-            <span class="skill">{{ g.skill }}</span>
-            <span class="go">补齐 →</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- 创建匹配按钮 -->
-      <div v-if="loading" class="loading-card anim-fade-up anim-delay-2">
-        <div class="spinner"></div>
-        <p>准备创建匹配分析...</p>
-      </div>
-
-      <div v-else-if="jobStore.jobs.length === 0 || !resumeStore.profile" class="empty-card anim-fade-up anim-delay-2">
-        <p>请先完成简历解析和岗位分析</p>
-        <div class="actions">
-          <button class="btn btn-outline" @click="router.push('/resume')">解析简历</button>
-          <button class="btn" @click="router.push('/jobs')">分析岗位</button>
-        </div>
-      </div>
-
-      <div v-else class="create-match anim-fade-up anim-delay-2">
-        <button class="btn primary" @click="handleCreateMatch">
-          <span v-if="loading" class="spinner"></span>
-          生成能力匹配报告
-        </button>
-      </div>
-
-    <!-- 下一步导航：能力匹配完成后，引导进入面试准备 -->
-      <div class="next-step anim-fade-up anim-delay-4">
-        <div class="next-step-card">
-          <div class="next-step-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    <header class="topbar anim-fade">
+      <div class="topbar-left">
+        <BackButton class="topbar-back" />
+        <div class="brand" @click="router.push('/')">
+          <div class="brand-logo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
             </svg>
           </div>
-          <div class="next-step-info">
-            <strong>下一步：面试准备</strong>
-            <p>AI 模拟面试官，针对差距进行多轮对话练习</p>
-          </div>
-          <button class="btn btn-outline" @click="router.push('/interview')">
-            前往面试准备
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-          </button>
+          <span>CareerAI</span>
         </div>
       </div>
-    </div>
-    </div>
+      <nav>
+        <button @click="goBack">返回列表</button>
+      </nav>
+    </header>
+
+    <main class="content">
+      <div class="container">
+        <!-- 表单区域 -->
+        <div v-if="showForm" class="form-section anim-fade-up">
+          <h2>分析简历与岗位匹配度</h2>
+          <p class="form-desc">选择一份简历和一个岗位，系统将分析匹配度并提供改进建议</p>
+
+          <div class="form-group">
+            <label>选择简历</label>
+            <select v-model="resumeId" @change="selectResume(userResumes.find(r => r.id === resumeId))">
+              <option value="">请选择简历</option>
+              <option v-for="resume in userResumes" :key="resume.id" :value="resume.id">
+                {{ resume.username || '未知' }} - 简历分析
+              </option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>选择岗位</label>
+            <select v-model="jobId" @change="selectJob(userJobs.find(j => j.id === jobId))">
+              <option value="">请选择岗位</option>
+              <option v-for="job in userJobs" :key="job.id" :value="job.id">
+                {{ job.position_title || '未知' }} - 岗位分析
+              </option>
+            </select>
+          </div>
+
+          <div class="selected-info" v-if="selectedResume || selectedJob">
+            <h3>已选择</h3>
+            <div class="selected-items">
+              <div v-if="selectedResume" class="selected-item">
+                <strong>简历：</strong>
+                {{ selectedResume.username || '未知' }}
+              </div>
+              <div v-if="selectedJob" class="selected-item">
+                <strong>岗位：</strong>
+                {{ selectedJob.position_title || '未知' }}
+              </div>
+            </div>
+          </div>
+
+          <button
+            @click="startAnalysis"
+            :disabled="analyzing || !resumeId || !jobId"
+            class="primary-button"
+          >
+            <span v-if="analyzing" class="loading">分析中...</span>
+            <span v-else>开始分析</span>
+          </button>
+        </div>
+
+        <!-- 结果展示区域 -->
+        <div v-else class="result-section anim-fade-up">
+          <h2>匹配度分析结果</h2>
+
+          <div v-if="loading" class="loading-state">
+            <div class="spinner"></div>
+            <p>加载匹配数据中...</p>
+          </div>
+
+          <div v-else-if="currentMatch" class="match-results">
+            <!-- 总体匹配度 -->
+            <div class="overall-match">
+              <div class="match-score">
+                <div class="score-circle" :style="`--color: ${matchLevel?.color || '#8b5cf6'}`">
+                  <span class="score-number">{{ currentMatch.overall_score }}</span>
+                  <span class="score-label">分</span>
+                </div>
+                <div class="match-info">
+                  <h3>总体匹配度</h3>
+                  <div class="match-level" :class="matchLevel?.text">
+                    {{ matchLevel?.level }}
+                  </div>
+                  <p class="match-summary">
+                    {{ getMatchSummary(currentMatch.overall_score) }}
+                  </p>
+                </div>
+              </div>
+
+              <!-- 匹配进度 -->
+              <div class="match-progress">
+                <h4>改进进度</h4>
+                <div class="progress-bar">
+                  <div
+                    class="progress-fill"
+                    :style="`width: ${matchProgress}%`"
+                  ></div>
+                </div>
+                <div class="progress-text">
+                  {{ matchProgress }}% 已完成
+                </div>
+              </div>
+            </div>
+
+            <!-- 各维度匹配度 -->
+            <div class="dimensions" v-if="matchBreakdown">
+              <h3>各维度匹配度</h3>
+              <div class="dimension-cards">
+                <div
+                  v-for="(dim, key) in matchBreakdown"
+                  :key="key"
+                  class="dimension-card"
+                  :style="`--color: ${dim.color}`"
+                >
+                  <div class="dim-header">
+                    <h4>{{ dim.label }}</h4>
+                    <span class="dim-score">{{ dim.score }}%</span>
+                  </div>
+                  <div class="dim-bar">
+                    <div class="dim-fill" :style="`width: ${dim.score}%`"></div>
+                  </div>
+                  <div class="dim-weight">
+                    权重: {{ (dim.weight * 100).toFixed(0) }}%
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 差距分析 -->
+            <div class="gap-analysis" v-if="currentMatch.gaps && currentMatch.gaps.length > 0">
+              <h3>差距分析</h3>
+              <div class="gap-list">
+                <div
+                  v-for="gap in currentMatch.gaps"
+                  :key="gap.skill_name || gap.experience_type || gap.id"
+                  class="gap-item"
+                >
+                  <div class="gap-header">
+                    <div class="gap-type">{{ getGapTypeLabel(gap.type) }}</div>
+                    <div class="gap-severity" :class="matchStore.getGapSeverity(gap.severity).text">
+                      {{ matchStore.getGapSeverity(gap.severity).level }}优先级
+                    </div>
+                  </div>
+                  <div class="gap-content">
+                    <p>{{ gap.description }}</p>
+                    <div v-if="gap.skill_name" class="gap-detail">
+                      <span class="label">技能：</span>
+                      <span>{{ gap.skill_name }}</span>
+                    </div>
+                    <div v-if="gap.current_level !== undefined && gap.target_level !== undefined" class="gap-detail">
+                      <span class="label">当前熟练度：</span>
+                      <span>{{ gap.current_level }}</span>
+                      <span class="arrow">→</span>
+                      <span>目标{{ gap.target_level }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 改进建议 -->
+            <div class="recommendations" v-if="currentMatch.recommendations && currentMatch.recommendations.length > 0">
+              <h3>改进建议</h3>
+              <div class="recommendation-list">
+                <div
+                  v-for="(rec, index) in currentMatch.recommendations"
+                  :key="index"
+                  class="recommendation-item"
+                >
+                  <div class="rec-header">
+                    <div class="rec-type">{{ rec.type }}</div>
+                    <div class="rec-priority" :class="matchStore.getRecommendationPriority(rec.priority).text">
+                      {{ matchStore.getRecommendationPriority(rec.priority).level }}优先级
+                    </div>
+                  </div>
+                  <div class="rec-content">
+                    <p>{{ rec.description }}</p>
+                    <div v-if="rec.estimated_time" class="rec-time">
+                      <span class="label">预估时间：</span>
+                      <span>{{ rec.estimated_time }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 操作按钮 -->
+            <div class="action-buttons">
+              <button @click="generateFeedback" class="secondary-button">
+                生成详细学习计划
+              </button>
+              <button @click="router.push('/resume')" class="secondary-button">
+                查看简历详情
+              </button>
+              <button @click="router.push('/jobs')" class="secondary-button">
+                查看岗位详情
+              </button>
+            </div>
+          </div>
+
+          <div v-else-if="error" class="error-state">
+            <div class="error-icon">❌</div>
+            <h3>加载失败</h3>
+            <p>{{ error }}</p>
+            <button @click="loadMatchDetail" class="primary-button">
+              重试
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
   </div>
 </template>
 
 <style scoped>
-.page { min-height: 100vh; position: relative; overflow: hidden; }
+.match-analysis { min-height: 100vh; position: relative; overflow: hidden; }
 .page-bg {
   position: fixed; inset: 0; z-index: -2;
-  background: linear-gradient(-45deg, #eff6ff, #fdf2f8, #eef2ff, #f0fdf4);
+  background: linear-gradient(-45deg, #f0f4ff, #e0e7ff, #f3e8ff, #e0f2fe);
   background-size: 400% 400%;
   animation: gradientShift 12s ease infinite;
 }
@@ -246,187 +396,352 @@ async function handleCreateMatch() {
   position: fixed; border-radius: 50%; filter: blur(70px); z-index: -1;
   animation: float 8s ease-in-out infinite;
 }
-.blob-a { width: 320px; height: 320px; background: #667eea; opacity: 0.1; top: -60px; left: -50px; }
-.blob-b { width: 280px; height: 280px; background: #f093fb; opacity: 0.09; bottom: -50px; right: -30px; animation-delay: -4s; }
+.blob-a { width: 320px; height: 320px; background: #667eea; opacity: 0.1; top: -60px; left: -40px; }
+.blob-b { width: 280px; height: 280px; background: #f093fb; opacity: 0.08; bottom: -40px; right: -30px; animation-delay: -4s; }
 
-/* 加载和空状态 */
-.loading-card, .empty-card {
-  text-align: center;
-  padding: 3rem;
-  background: rgba(255,255,255,0.6);
-  backdrop-filter: blur(12px);
-  border-radius: 16px;
-  margin-top: 1rem;
-}
-.loading-card .spinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid rgba(102,126,234,0.1);
-  border-top-color: #667eea;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin: 0 auto 1rem;
-}
-.empty-card p { color: #718096; margin-bottom: 1rem; }
-.actions {
+/* 顶栏 */
+.topbar {
+  background: rgba(255,255,255,0.7);
+  backdrop-filter: blur(16px);
+  padding: 0.9rem 2rem;
   display: flex;
-  gap: 1rem;
-  justify-content: center;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.06);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  border-bottom: 1px solid rgba(255,255,255,0.5);
 }
-
-.create-match {
-  text-align: center;
-  margin-top: 1rem;
+.topbar-left { display: flex; align-items: center; gap: 0.9rem; }
+.brand { display: flex; align-items: center; gap: 0.6rem; font-weight: 800; font-size: 1.15rem; cursor: pointer; }
+.brand-logo { width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg, var(--primary), var(--secondary)); color: #fff; display: flex; align-items: center; justify-content: center; animation: pulse 3s ease-in-out infinite; }
+.brand-logo svg { width: 20px; height: 20px; }
+.topbar nav { display: flex; gap: 0.5rem; }
+.topbar nav button {
+  display: flex; align-items: center; gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.25s ease;
 }
-.create-match .btn {
-  padding: 1rem 2rem;
-  font-size: 1rem;
-  font-weight: 600;
-}
-
-.page-inner { padding: 2rem; max-width: 860px; margin: 0 auto; }
-.page-back { margin-bottom: 1.2rem; }
-
-.page-header { display: flex; align-items: center; gap: 1.1rem; margin-bottom: 1.6rem; }
-.header-icon {
-  width: 56px; height: 56px;
-  border-radius: 16px;
-  background: linear-gradient(135deg, #f093fb, #667eea);
+.topbar nav button:hover {
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
   color: #fff;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
-  box-shadow: 0 8px 20px rgba(240,147,251,0.3);
-  animation: pulse 3.5s ease-in-out infinite;
+  border-color: transparent;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(102,126,234,0.35);
 }
-.header-icon svg { width: 28px; height: 28px; }
-.page-header h2 { font-size: 1.5rem; color: #1a202c; }
-.page-header p { font-size: 0.9rem; color: #718096; margin-top: 0.25rem; }
 
-/* 总分卡 */
-.score-card {
-  display: flex;
-  align-items: center;
-  gap: 2rem;
-  background: rgba(255,255,255,0.6);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255,255,255,0.5);
-  border-radius: 18px;
-  padding: 1.8rem;
-  box-shadow: 0 4px 24px rgba(102,126,234,0.08);
-  margin-bottom: 1.4rem;
+/* 主体 */
+.content { padding: 2rem; max-width: 1100px; margin: 0 auto; }
+.container { background: rgba(255,255,255,0.6); backdrop-filter: blur(12px); border-radius: 20px; padding: 2rem; box-shadow: 0 2px 16px rgba(0,0,0,0.04); }
+
+/* 表单样式 */
+.form-section h2 { font-size: 1.8rem; color: #1a202c; margin-bottom: 0.5rem; }
+.form-desc { color: #718096; margin-bottom: 2rem; }
+.form-group {
+  margin-bottom: 1.5rem;
 }
-.score-ring { position: relative; width: 150px; height: 150px; flex-shrink: 0; }
-.ring-progress { transition: stroke-dashoffset 1.6s cubic-bezier(0.22, 1, 0.36, 1); transform: rotate(-90deg); transform-origin: center; }
-.score-num {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: #2d3748;
 }
-.score-num strong { font-size: 2.4rem; background: linear-gradient(135deg, #667eea, #f093fb); -webkit-background-clip: text; background-clip: text; color: transparent; }
-.score-num span { font-size: 0.75rem; color: #a0aec0; }
-.score-summary h3 { margin-bottom: 0.5rem; color: #2d3748; }
-.score-summary p { font-size: 0.92rem; color: #718096; line-height: 1.7; margin-bottom: 1rem; }
-.score-summary strong { color: #e53e3e; }
-.btn {
-  padding: 0.65rem 1.6rem;
+.form-group select {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  font-size: 1rem;
+  transition: all 0.25s ease;
+}
+.form-group select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
+}
+
+/* 选择信息 */
+.selected-info {
+  background: rgba(255,255,255,0.5);
+  border-radius: 10px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+}
+.selected-info h3 { font-size: 1rem; color: #2d3748; margin-bottom: 0.5rem; }
+.selected-item {
+  color: #4a5568;
+  margin-bottom: 0.5rem;
+}
+.selected-item strong { color: #2d3748; }
+
+/* 按钮样式 */
+.primary-button {
   background: linear-gradient(135deg, var(--primary), var(--secondary));
   color: #fff;
   border: none;
   border-radius: 10px;
-  font-size: 0.9rem;
+  padding: 0.75rem 2rem;
+  font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.25s ease;
-}
-.btn:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(102,126,234,0.35); }
-
-/* 面板 */
-.panels { display: grid; grid-template-columns: 1.2fr 1fr; gap: 1.2rem; }
-.panel { background: rgba(255,255,255,0.6); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.5); border-radius: 16px; padding: 1.5rem; box-shadow: 0 2px 16px rgba(0,0,0,0.05); }
-.panel h3 { font-size: 1.02rem; margin-bottom: 1.2rem; color: #2d3748; }
-
-/* 条形图 */
-.bars { display: flex; flex-direction: column; gap: 0.9rem; }
-.bar-row { display: flex; align-items: center; gap: 0.8rem; }
-.bar-label { width: 72px; font-size: 0.85rem; color: #4a5568; flex-shrink: 0; }
-.bar-track { flex: 1; height: 10px; background: #edf2f7; border-radius: 999px; overflow: hidden; }
-.bar-fill {
-  height: 100%;
-  border-radius: 999px;
-  transition: width 1.2s cubic-bezier(0.22, 1, 0.36, 1);
-}
-.bar-val { width: 32px; text-align: right; font-size: 0.85rem; color: #667eea; }
-
-/* 差距清单 */
-.gaps { display: flex; flex-direction: column; gap: 0.7rem; }
-.gap-item {
+  transition: all 0.25s ease;
   display: flex;
   align-items: center;
-  gap: 0.7rem;
-  padding: 0.7rem 0.9rem;
-  background: rgba(255,255,255,0.5);
-  backdrop-filter: blur(8px);
-  border-radius: 10px;
-  font-size: 0.88rem;
-  animation: bubbleIn 0.5s ease both;
-  transition: transform 0.2s ease, background 0.2s ease;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
 }
-.gap-item:hover { transform: translateX(4px); background: rgba(255,255,255,0.7); }
-.prio {
-  font-size: 0.7rem;
+.primary-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(102,126,234,0.3);
+}
+.primary-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* 结果样式 */
+.result-section h2 { font-size: 1.8rem; color: #1a202c; margin-bottom: 2rem; }
+
+/* 总体匹配度 */
+.overall-match {
+  background: rgba(255,255,255,0.7);
+  border-radius: 16px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+}
+.match-score { display: flex; align-items: center; gap: 1.5rem; }
+.score-circle {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: var(--color);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   color: #fff;
-  padding: 0.15rem 0.5rem;
+  position: relative;
+  box-shadow: 0 4px 20px rgba(139,92,246,0.3);
+}
+.score-number { font-size: 2.5rem; font-weight: 700; line-height: 1; }
+.score-label { font-size: 0.9rem; opacity: 0.9; }
+.match-info h3 { font-size: 1.2rem; margin-bottom: 0.5rem; color: #2d3748; }
+.match-level {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+.match-summary { color: #718096; }
+
+/* 匹配进度 */
+.match-progress h4 { font-size: 1rem; color: #2d3748; margin-bottom: 0.5rem; }
+.progress-bar {
+  height: 8px;
+  background: #edf2f7;
   border-radius: 999px;
-  flex-shrink: 0;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
 }
-.skill { color: #2d3748; font-weight: 500; }
-.go { margin-left: auto; font-size: 0.78rem; color: #a0aec0; }
-.gap-item:hover .go { color: var(--primary); }
+.progress-fill {
+  height: 100%;
+  background: var(--color);
+  border-radius: 999px;
+  transition: width 1s ease;
+}
+.progress-text { font-size: 0.9rem; color: #4a5568; }
 
-@media (max-width: 760px) {
-  .score-card { flex-direction: column; text-align: center; }
-  .panels { grid-template-columns: 1fr; }
-}
-
-/* 下一步导航 */
-.next-step { margin-top: 1.8rem; }
-.next-step-card {
-  display: flex; align-items: center; gap: 1rem;
-  padding: 1.2rem 1.4rem;
-  background: linear-gradient(135deg, #f0fdf4, #e0f2fe);
-  border: 1px solid #b7ebd0;
-  border-radius: 14px;
-  transition: transform 0.25s ease, box-shadow 0.25s ease;
-}
-.next-step-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(67,233,123,0.12); }
-.next-step-icon {
-  width: 44px; height: 44px;
+/* 各维度匹配度 */
+.dimensions h3 { font-size: 1.3rem; color: #1a202c; margin-bottom: 1rem; }
+.dimension-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+.dimension-card {
+  background: rgba(255,255,255,0.6);
   border-radius: 12px;
-  background: linear-gradient(135deg, #43e97b, #4facfe);
-  color: #fff;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
+  padding: 1.5rem;
+  border: 1px solid rgba(139,92,246,0.1);
 }
-.next-step-icon svg { width: 22px; height: 22px; }
-.next-step-info { flex: 1; }
-.next-step-info strong { display: block; font-size: 0.95rem; color: #1a202c; margin-bottom: 0.15rem; }
-.next-step-info p { font-size: 0.82rem; color: #718096; }
-.btn-outline {
-  padding: 0.6rem 1.2rem;
-  background: transparent;
-  color: #43e97b;
-  border: 1.5px solid #43e97b;
+.dim-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.dim-header h4 { color: #2d3748; font-size: 1rem; }
+.dim-score { font-size: 1.2rem; font-weight: 700; color: var(--color); }
+.dim-bar {
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+.dim-fill {
+  height: 100%;
+  background: var(--color);
+  border-radius: 999px;
+}
+.dim-weight { font-size: 0.8rem; color: #718096; text-align: center; }
+
+/* 差距分析 */
+.gap-analysis h3 { font-size: 1.3rem; color: #1a202c; margin-bottom: 1rem; }
+.gap-list { display: flex; flex-direction: column; gap: 1rem; }
+.gap-item {
+  background: rgba(255,255,255,0.5);
+  border-radius: 12px;
+  padding: 1.5rem;
+  border-left: 4px solid #f59e0b;
+}
+.gap-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+.gap-type { font-weight: 600; color: #2d3748; }
+.gap-severity { font-size: 0.9rem; font-weight: 600; }
+.gap-content p { color: #4a5568; margin-bottom: 0.5rem; line-height: 1.6; }
+.gap-detail {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: #718096;
+}
+.label { color: #4a5568; font-weight: 500; }
+.arrow { color: #a0aec0; }
+
+/* 改进建议 */
+.recommendations h3 { font-size: 1.3rem; color: #1a202c; margin-bottom: 1rem; }
+.recommendation-list { display: flex; flex-direction: column; gap: 1rem; }
+.recommendation-item {
+  background: rgba(255,255,255,0.5);
+  border-radius: 12px;
+  padding: 1.5rem;
+  border-left: 4px solid #10b981;
+}
+.rec-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+.rec-type { font-weight: 600; color: #2d3748; }
+.rec-priority { font-size: 0.9rem; font-weight: 600; }
+.rec-content p { color: #4a5568; margin-bottom: 0.5rem; line-height: 1.6; }
+.rec-time {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: #718096;
+}
+
+/* 操作按钮 */
+.action-buttons {
+  display: flex;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+.secondary-button {
+  background: #fff;
+  color: var(--primary);
+  border: 1px solid var(--primary);
   border-radius: 10px;
-  font-size: 0.88rem;
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
-  display: inline-flex; align-items: center; gap: 0.4rem;
-  white-space: nowrap;
-  transition: all 0.2s ease;
+  transition: all 0.25s ease;
 }
-.btn-outline:hover { background: #43e97b; color: #fff; }
-.btn-outline svg { width: 16px; height: 16px; }
+.secondary-button:hover {
+  background: var(--primary);
+  color: #fff;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(102,126,234,0.2);
+}
+
+/* 状态样式 */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+}
+.spinner {
+  width: 50px;
+  height: 50px;
+  border: 3px solid #e2e8f0;
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 1rem;
+}
+.error-state {
+  text-align: center;
+  padding: 3rem;
+}
+.error-icon { font-size: 4rem; margin-bottom: 1rem; color: #ef4444; }
+
+/* 动画 */
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-20px); }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.8; }
+}
+
+/* 动画延迟 */
+.anim-fade-up {
+  animation: fadeInUp 0.6s ease-out;
+}
+.anim-fade {
+  animation: fadeIn 0.6s ease-out;
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.anim-delay-1 { animation-delay: 0.1s; }
+.anim-delay-2 { animation-delay: 0.2s; }
+.anim-delay-3 { animation-delay: 0.3s; }
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .overall-match {
+    grid-template-columns: 1fr;
+  }
+  .dimension-cards {
+    grid-template-columns: 1fr;
+  }
+  .action-buttons {
+    flex-direction: column;
+  }
+}
 </style>

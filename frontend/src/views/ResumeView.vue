@@ -15,6 +15,7 @@ const result = ref<any>(null)
 const fileName = ref('')
 const fileInput = ref<HTMLInputElement | null>(null)
 const editing = ref(false)
+const showDetailed = ref(false)
 
 async function handleParse() {
   if (!resumeText.value.trim()) return
@@ -31,8 +32,8 @@ async function handleParse() {
         phone: resumeStore.profile.phone,
         summary: resumeStore.profile.summary,
         skills: resumeStore.profile.skills,
-        experiences: resumeStore.profile.experiences,
-        education: resumeStore.profile.education
+        experiences: resumeStore.profile.experiences_details,
+        education: resumeStore.profile.education_details
       }
     }
   } catch (e: any) {
@@ -72,8 +73,8 @@ async function handleUpload(file: File) {
         phone: resumeStore.profile.phone,
         summary: resumeStore.profile.summary,
         skills: resumeStore.profile.skills,
-        experiences: resumeStore.profile.experiences,
-        education: resumeStore.profile.education
+        experiences: resumeStore.profile.experiences_details,
+        education: resumeStore.profile.education_details
       }
     }
   } catch (e: any) {
@@ -114,8 +115,8 @@ onMounted(async () => {
         phone: resumeStore.profile.phone,
         summary: resumeStore.profile.summary,
         skills: resumeStore.profile.skills,
-        experiences: resumeStore.profile.experiences,
-        education: resumeStore.profile.education
+        experiences: resumeStore.profile.experiences_details,
+        education: resumeStore.profile.education_details
       }
     }
   } catch (err) {
@@ -279,6 +280,37 @@ onMounted(async () => {
           <strong>{{ edu.school }}</strong>
           <span>{{ edu.degree }} · {{ edu.major }}</span>
           <small v-if="edu.date_range">{{ edu.date_range }}</small>
+        </div>
+      </div>
+
+      <!-- 视图切换 -->
+      <div v-if="result" class="view-toggle anim-fade-up">
+        <button
+          class="toggle-btn"
+          :class="{ active: !showDetailed }"
+          @click="showDetailed = false"
+        >
+          简化视图
+        </button>
+        <button
+          class="toggle-btn"
+          :class="{ active: showDetailed }"
+          @click="showDetailed = true"
+        >
+          详细视图
+        </button>
+      </div>
+
+      <!-- 经历 - 详细视图 -->
+      <div v-if="result.experiences?.length && showDetailed" class="result-section">
+        <h4>经历详情</h4>
+        <div v-for="(exp, i) in result.experiences" :key="i" class="exp-item">
+          <div class="exp-header">
+            <span class="exp-type">{{ typeLabel(exp.type) }}</span>
+            <strong>{{ exp.title }}</strong>
+            <small v-if="exp.date_range">{{ exp.date_range }}</small>
+          </div>
+          <p v-if="exp.description" class="exp-desc">{{ exp.description }}</p>
         </div>
       </div>
 
@@ -649,4 +681,38 @@ onMounted(async () => {
   transition: all 0.2s ease;
 }
 .btn-secondary:hover { background: #cbd5e0; }
+
+/* 视图切换 */
+.view-toggle {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  background: #f8fafc;
+  padding: 0.5rem;
+  border-radius: 12px;
+  width: fit-content;
+}
+
+.toggle-btn {
+  padding: 0.5rem 1.2rem;
+  background: transparent;
+  color: #718096;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.toggle-btn:hover {
+  background: #e2e8f0;
+  color: #4a5568;
+}
+
+.toggle-btn.active {
+  background: #667eea;
+  color: #fff;
+  border-color: #667eea;
+}
 </style>

@@ -15,6 +15,8 @@ export const useResumeStore = defineStore('resume', () => {
       profile.value = await getProfile()
     } catch (err: any) {
       error.value = err.response?.data?.detail || '获取简历信息失败'
+      console.error('获取简历信息失败:', err)
+      profile.value = null
     } finally {
       loading.value = false
     }

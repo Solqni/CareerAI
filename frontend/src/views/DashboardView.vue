@@ -52,6 +52,14 @@ onMounted(async () => {
     updateStats()
   } catch (error) {
     console.error('获取数据失败:', error)
+    console.error('错误详情:', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+      config: error.config?.url
+    })
+    // 显示友好的错误信息
+    alert('加载 dashboard 数据失败，请重新登录。错误: ' + (error.message || '未知错误'))
   }
   animateNumbers()
 })
@@ -69,6 +77,8 @@ function updateStats() {
   if (matches && matches.length > 0) {
     const avgMatch = matches.reduce((sum: number, m: any) => sum + (m.score || 0), 0) / matches.length
     stats.value[1].target = Math.round(avgMatch)
+  } else {
+    stats.value[1].target = 0
   }
 
   // 更新学习任务（暂时用固定值）
@@ -77,10 +87,8 @@ function updateStats() {
   // 更新模拟面试（暂时用固定值）
   stats.value[3].target = 3
 
-  // 更新进度条（如果有匹配数据）
-  if (stats.value[1].target > 0) {
-    progress.value = Math.min(stats.value[1].target, 100)
-  }
+  // 更新进度条
+  progress.value = Math.min(stats.value[1].target, 100)
 }
 </script>
 

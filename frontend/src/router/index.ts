@@ -43,7 +43,31 @@ const router = createRouter({
     },
     { path: '/resume', name: 'resume', component: () => import('@/views/ResumeView.vue') },
     { path: '/jobs', name: 'jobs', component: () => import('@/views/JobsView.vue') },
-    { path: '/match', name: 'match', component: () => import('@/views/MatchView.vue') },
+    { path: '/match', name: 'match-list', component: () => import('@/views/MatchListView.vue') },
+    {
+      path: '/match',
+      name: 'match',
+      component: () => import('@/views/MatchView.vue'),
+      props: route => ({
+        resumeId: route.query.resumeId ? Number(route.query.resumeId) : null,
+        jobId: route.query.jobId ? Number(route.query.jobId) : null
+      })
+    },
+    {
+      path: '/match/result/:resumeId/:jobId',
+      name: 'match-result',
+      component: () => import('@/views/MatchView.vue'),
+      props: route => ({
+        resumeId: Number(route.params.resumeId),
+        jobId: Number(route.params.jobId)
+      })
+    },
+    {
+      path: '/match/detail/:matchId',
+      name: 'match-detail',
+      component: () => import('@/views/MatchView.vue'),
+      props: route => ({ matchId: route.params.matchId })
+    },
     { path: '/interview', name: 'interview', component: () => import('@/views/InterviewView.vue') },
   ],
 })

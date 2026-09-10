@@ -30,6 +30,11 @@ export async function register(payload: RegisterPayload): Promise<TokenResponse 
 }
 
 export async function getMe(): Promise<User> {
-  const { data } = await api.get<User>('/auth/me')
-  return data
+  try {
+    const { data } = await api.get<User>('/auth/me')
+    return data
+  } catch (error) {
+    console.error('获取用户信息失败:', error)
+    throw error
+  }
 }

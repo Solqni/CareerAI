@@ -3,11 +3,17 @@ import { useAuthStore } from '@/stores/auth'
 // 检查用户是否已登录
 export function checkAuth(_to: any, _from: any, next: any) {
   const auth = useAuthStore()
+  console.log('checkAuth:', { hasToken: !!auth.token, tokenLength: auth.token?.length })
   if (!auth.token) {
     // 未登录，跳转到登录页
     next('/login')
   } else {
-    next()
+    // 确保用户信息已加载
+    if (!auth.user) {
+      auth.fetchUser().then(() => next()).catch(() => next('/login'))
+    } else {
+      next()
+    }
   }
 }
 

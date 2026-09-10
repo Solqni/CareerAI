@@ -1,5 +1,49 @@
 import api from './index'
 
+export interface Skill {
+  id: number
+  skill_name: string
+  proficiency: number
+  source: string
+}
+
+export interface ParsedExperience {
+  type: string | null
+  title: string | null
+  description: string | null
+  date_range: string | null
+}
+
+export interface ParsedEducation {
+  school: string | null
+  degree: string | null
+  major: string | null
+  date_range: string | null
+}
+
+export interface Profile {
+  username: string
+  email: string | null
+  phone: string | null
+  education: string | null
+  education_details: ParsedEducation[]
+  skills: Skill[]
+  experiences: string[]
+  experiences_details: ParsedExperience[]
+  summary: string | null
+}
+
+/** 获取用户能力画像（最新简历解析结果 + 技能表合并） */
+export async function getProfile(): Promise<Profile> {
+  try {
+    const { data } = await api.get<Profile>('/resume/profile')
+    return data
+  } catch (error) {
+    console.error('获取能力画像失败:', error)
+    throw error
+  }
+}
+
 /** 粘贴文本解析简历 */
 export function parseResumeText(raw_text: string) {
   return api.post('/resume/parse', { raw_text }, { timeout: 120000 })
