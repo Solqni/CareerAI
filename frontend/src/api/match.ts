@@ -73,7 +73,7 @@ export interface MatchFeedback {
 
 // 分析匹配度
 export function analyzeMatch(data: MatchAnalysisRequest): Promise<MatchAnalysisResult> {
-  return api.post<MatchAnalysisResult>('/match/analyze', data)
+  return api.post<MatchAnalysisResult>('/match/analyze', data).then(r => r.data)
 }
 
 // 获取匹配列表
@@ -88,7 +88,7 @@ export function getMatches(): Promise<MatchListItem[]> {
 
 // 获取匹配详情
 export function getMatchDetail(matchId: string): Promise<MatchAnalysisResult> {
-  return api.get(`/match/${matchId}`)
+  return api.get<MatchAnalysisResult>(`/match/${matchId}`).then(r => r.data)
 }
 
 // 生成匹配反馈和学习计划

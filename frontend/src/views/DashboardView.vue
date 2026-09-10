@@ -50,7 +50,7 @@ onMounted(async () => {
 
     // 更新统计数据
     updateStats()
-  } catch (error) {
+  } catch (error: any) {
     console.error('获取数据失败:', error)
     console.error('错误详情:', {
       message: error.message,

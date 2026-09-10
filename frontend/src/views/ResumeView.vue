@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { parseResumeText, uploadResumeFile } from '@/api/resume'
 import BackButton from '@/components/BackButton.vue'
 import { useResumeStore } from '@/stores/resume'
 

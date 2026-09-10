@@ -5,7 +5,6 @@ import { useResumeStore } from '@/stores/resume'
 import { useJobStore } from '@/stores/job'
 import { useMatchStore } from '@/stores/match'
 import BackButton from '@/components/BackButton.vue'
-import { analyzeMatch } from '@/api/match'
 
 const router = useRouter()
 const route = useRoute()
@@ -34,7 +33,7 @@ const matchBreakdown = computed(() => matchStore.matchBreakdown)
 // 获取用户简历列表
 const userResumes = computed(() => {
   // 这里应该从API获取用户的简历列表
-  return [] // 暂时返回空数组
+  return [] as Array<{ id: number; username?: string }> // 暂时返回空数组
 })
 
 // 获取用户岗位列表
@@ -113,13 +112,6 @@ function selectResume(resume: any) {
 function selectJob(job: any) {
   selectedJob.value = job
   jobId.value = job.id
-}
-
-// 导航到结果页
-function viewResult() {
-  if (resumeId.value && jobId.value) {
-    router.push(`/match/result/${resumeId.value}/${jobId.value}`)
-  }
 }
 
 // 返回列表
@@ -304,7 +296,7 @@ function generateFeedback() {
               <div class="gap-list">
                 <div
                   v-for="gap in currentMatch.gaps"
-                  :key="gap.skill_name || gap.experience_type || gap.id"
+                  :key="gap.skill_name || gap.experience_type || gap.description"
                   class="gap-item"
                 >
                   <div class="gap-header">

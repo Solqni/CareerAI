@@ -2,12 +2,10 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import BackButton from '@/components/BackButton.vue'
-import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
-const auth = useAuthStore()
 
-const collections = ref([])
+const collections = ref<Array<{ docCount?: number }>>([])
 const loading = ref(true)
 const error = ref('')
 
@@ -22,18 +20,9 @@ const fetchCollections = async () => {
   }
 }
 
-// 重新构建知识库
-const rebuildKnowledge = (collectionId: string) => {
-  // TODO: 实现知识库重建功能
-  alert(`知识库重建功能开发中`)
-}
-
-// 删除知识库
-const deleteCollection = (collectionId: string) => {
-  // TODO: 实现知识库删除功能
-  if (confirm('确定要删除这个知识库吗？')) {
-    alert('知识库删除功能开发中')
-  }
+// 显示提示（模板中无法直接访问 window.alert）
+const showAlert = (message: string) => {
+  alert(message)
 }
 
 onMounted(() => {
@@ -116,7 +105,7 @@ onMounted(() => {
       <div class="collections-section anim-fade-up anim-delay-3">
         <div class="section-header">
           <h3>知识库列表</h3>
-          <button class="add-btn" @click="alert('添加新知识库功能开发中')">
+          <button class="add-btn" @click="showAlert('添加新知识库功能开发中')">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="12" y1="5" x2="12" y2="19"></line>
               <line x1="5" y1="12" x2="19" y2="12"></line>

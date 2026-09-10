@@ -30,7 +30,7 @@ export const useJobStore = defineStore('job', () => {
 
       // 保存当前解析的岗位
       currentJob.value = {
-        id: Date.now().toString(),
+        id: Date.now(),
         title: result.data.parsed_json.position_title || '未命名岗位',
         jd_text: jdText,
         parsed_json: result.data.parsed_json,
@@ -72,7 +72,7 @@ export const useJobStore = defineStore('job', () => {
   }
 
   // 删除岗位
-  async function deleteJob(jobId: string) {
+  async function deleteJob(jobId: number) {
     try {
       loading.value = true
       error.value = ''

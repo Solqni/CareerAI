@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { parseJobDescription } from '@/api/job'
 import BackButton from '@/components/BackButton.vue'
 import { useJobStore } from '@/stores/job'
 
