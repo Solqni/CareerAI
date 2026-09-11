@@ -223,16 +223,26 @@ onMounted(async () => {
     <div v-if="result" class="result-card anim-fade-up">
       <div class="result-header">
         <h3>简历信息</h3>
-        <button v-if="!editing" class="edit-btn" @click="editing = true">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-          </svg>
-          编辑
-        </button>
+        <div class="header-actions">
+          <div class="view-toggle">
+            <button class="toggle-btn" :class="{ active: !showDetailed }" @click="showDetailed = false">
+              简化视图
+            </button>
+            <button class="toggle-btn" :class="{ active: showDetailed }" @click="showDetailed = true">
+              详细视图
+            </button>
+          </div>
+          <button v-if="!editing" class="edit-btn" @click="editing = true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+            </svg>
+            编辑
+          </button>
+        </div>
       </div>
 
-      <!-- 基本信息 -->
+      <!-- 基本信息（两种视图均显示） -->
       <div v-if="result.name || result.email || result.phone" class="result-section">
         <h4>基本信息</h4>
         <div class="info-row">
@@ -242,74 +252,56 @@ onMounted(async () => {
         </div>
       </div>
 
-      <!-- 个人概述 -->
+      <!-- 个人概述：简化视图两行截断，详细视图完整显示 -->
       <div v-if="result.summary" class="result-section">
         <h4>个人概述</h4>
-        <p class="summary-text">{{ result.summary }}</p>
+        <p class="summary-text" :class="{ clamp: !showDetailed }">{{ result.summary }}</p>
+        <button v-if="!showDetailed && result.summary.length > 60" class="expand-hint" @click="showDetailed = true">
+          展开完整概述 →
+        </button>
       </div>
 
-      <!-- 技能 -->
+      <!-- 技能：简化视图只显示前 8 项技能名，详细视图带熟练度 -->
       <div v-if="result.skills?.length" class="result-section">
         <h4>技能清单</h4>
         <div class="skill-tags">
-          <span v-for="skill in result.skills" :key="skill.skill_name" class="skill-tag">
-            {{ skill.skill_name }}
-            <small>{{ proficiencyLabel(skill.proficiency) }}</small>
-          </span>
+          <template v-if="showDetailed">
+            <span v-for="skill in result.skills" :key="skill.skill_name" class="skill-tag">
+              {{ skill.skill_name }}
+              <small>{{ proficiencyLabel(skill.proficiency) }}</small>
+            </span>
+          </template>
+          <template v-else>
+            <span v-for="skill in result.skills.slice(0, 8)" :key="skill.skill_name" class="skill-tag">
+              {{ skill.skill_name }}
+            </span>
+            <span v-if="result.skills.length > 8" class="more-tag" @click="showDetailed = true">
+              +{{ result.skills.length - 8 }} 项
+            </span>
+          </template>
         </div>
       </div>
 
-      <!-- 经历 -->
+      <!-- 经历：简化视图只列标题，详细视图含描述与时间 -->
       <div v-if="result.experiences?.length" class="result-section">
         <h4>经历</h4>
         <div v-for="(exp, i) in result.experiences" :key="i" class="exp-item">
           <div class="exp-header">
             <span class="exp-type">{{ typeLabel(exp.type) }}</span>
             <strong>{{ exp.title }}</strong>
-            <small v-if="exp.date_range">{{ exp.date_range }}</small>
+            <small v-if="showDetailed && exp.date_range">{{ exp.date_range }}</small>
           </div>
-          <p v-if="exp.description" class="exp-desc">{{ exp.description }}</p>
+          <p v-if="showDetailed && exp.description" class="exp-desc">{{ exp.description }}</p>
         </div>
       </div>
 
-      <!-- 教育 -->
+      <!-- 教育：详细视图额外显示时间段 -->
       <div v-if="result.education?.length" class="result-section">
         <h4>教育背景</h4>
         <div v-for="(edu, i) in result.education" :key="i" class="edu-item">
           <strong>{{ edu.school }}</strong>
           <span>{{ edu.degree }} · {{ edu.major }}</span>
-          <small v-if="edu.date_range">{{ edu.date_range }}</small>
-        </div>
-      </div>
-
-      <!-- 视图切换 -->
-      <div v-if="result" class="view-toggle anim-fade-up">
-        <button
-          class="toggle-btn"
-          :class="{ active: !showDetailed }"
-          @click="showDetailed = false"
-        >
-          简化视图
-        </button>
-        <button
-          class="toggle-btn"
-          :class="{ active: showDetailed }"
-          @click="showDetailed = true"
-        >
-          详细视图
-        </button>
-      </div>
-
-      <!-- 经历 - 详细视图 -->
-      <div v-if="result.experiences?.length && showDetailed" class="result-section">
-        <h4>经历详情</h4>
-        <div v-for="(exp, i) in result.experiences" :key="i" class="exp-item">
-          <div class="exp-header">
-            <span class="exp-type">{{ typeLabel(exp.type) }}</span>
-            <strong>{{ exp.title }}</strong>
-            <small v-if="exp.date_range">{{ exp.date_range }}</small>
-          </div>
-          <p v-if="exp.description" class="exp-desc">{{ exp.description }}</p>
+          <small v-if="showDetailed && edu.date_range">{{ edu.date_range }}</small>
         </div>
       </div>
 
@@ -714,4 +706,44 @@ onMounted(async () => {
   color: #fff;
   border-color: #667eea;
 }
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+/* 简化视图下概述两行截断 */
+.summary-text.clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.expand-hint {
+  margin-top: 0.4rem;
+  padding: 0;
+  background: none;
+  border: none;
+  color: #667eea;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.expand-hint:hover { text-decoration: underline; }
+
+/* 技能"更多"标签 */
+.more-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.4rem 0.9rem;
+  background: #f3f4ff;
+  border: 1px dashed #a5b4fc;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: #667eea;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+.more-tag:hover { background: #e8eaff; }
 </style>

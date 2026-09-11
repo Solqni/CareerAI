@@ -14,6 +14,18 @@ def get_chat_llm() -> ChatOpenAI:
     )
 
 
+def get_vision_llm() -> ChatOpenAI:
+    """获取视觉 LLM 实例（识别 JD 截图等图片，走同一 OpenAI 兼容端点）。"""
+    return ChatOpenAI(
+        model=settings.DEEPSEEK_VISION_MODEL,
+        api_key=settings.DEEPSEEK_API_KEY,
+        base_url=settings.DEEPSEEK_BASE_URL,
+        temperature=0,
+        timeout=settings.LLM_TIMEOUT,
+        max_retries=1,
+    )
+
+
 def get_embeddings() -> OpenAIEmbeddings:
     """获取百炼文本向量模型实例（text-embedding-v3，OpenAI 兼容接口）。
 

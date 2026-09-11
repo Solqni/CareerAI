@@ -4,7 +4,7 @@ import json
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from app.llm.client import get_chat_llm
+from app.llm.client import get_chat_llm, get_vision_llm
 from app.schemas.job import JDParsedResult, ParsedJobRequirement
 from app.schemas.resume import (
     ParsedEducation,
@@ -112,3 +112,35 @@ async def parse_jd(jd_text: str) -> JDParsedResult:
         summary=data.get("summary"),
     )
     return result
+
+
+JD_IMAGE_PROMPT = """你是一位专业的岗位信息提取助手。请从这张图片中提取完整的岗位描述（JD）文字内容。
+
+要求：
+1. 逐字提取图片中与岗位相关的所有文字，保持原始顺序和段落结构
+2. 包括岗位名称、岗位职责、任职要求、技能要求、薪资待遇、公司信息等
+3. 不要添加图片中不存在的内容，不要总结或改写
+4. 如果图片中没有岗位相关的文字内容，只返回"NO_JD_CONTENT"
+
+直接返回提取的纯文本，不要包含任何解释。"""
+
+
+async def extract_jd_text_from_image(image_data_url: str) -> str:
+    """调用视觉 LLM 识别图片中的 JD 文本，返回纯文本。
+
+    image_data_url: 形如 data:image/png;base64,xxx 的图片 Data URL。
+    """
+    llm = get_vision_llm()
+    message = HumanMessage(
+        content=[
+            {"type": "image_url", "image_url": {"url": image_data_url}},
+            {"type": "text", "text": JD_IMAGE_PROMPT},
+        ]
+    )
+    response = await llm.ainvoke([message])
+    content = response.content if isinstance(response.content, str) else str(response.content)
+    text = content.strip()
+
+    if not text or "NO_JD_CONTENT" in text:
+        raise ValueError("无法从图片中识别出岗位描述内容，请确认图片包含完整的 JD 文字")
+    return text

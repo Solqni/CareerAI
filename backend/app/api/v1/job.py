@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
+import base64
+
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -6,7 +8,7 @@ from sqlalchemy.orm import selectinload
 from app.api.deps import get_current_user, get_db
 from app.models import JobAnalysis, JobRequirement, User
 from app.schemas.job import JDParsedResult, JobListItem, JobOut, JobParseRequest
-from app.services.parsing import parse_jd
+from app.services.parsing import extract_jd_text_from_image, parse_jd
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
@@ -21,11 +23,61 @@ async def parse_job_endpoint(
     if not payload.jd_text.strip():
         raise HTTPException(status_code=400, detail="JD 内容为空")
 
-    parsed: JDParsedResult = await parse_jd(payload.jd_text)
+    return await _parse_and_save_job(current_user, payload.jd_text, db)
+
+
+@router.post("/parse-image", response_model=JobOut)
+async def parse_job_image_endpoint(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """上传 JD 截图，视觉模型识别文字后解析入库。"""
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="文件名不能为空")
+
+    allowed_exts = (".jpg", ".jpeg", ".png", ".webp", ".bmp")
+    name = file.filename.lower()
+    if not name.endswith(allowed_exts):
+        raise HTTPException(status_code=400, detail="仅支持 JPG / PNG / WebP / BMP 图片格式")
+
+    file_bytes = await file.read()
+    if len(file_bytes) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="图片大小不能超过 10MB")
+    if not file_bytes:
+        raise HTTPException(status_code=400, detail="图片内容为空")
+
+    mime_map = {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".webp": "image/webp",
+        ".bmp": "image/bmp",
+    }
+    ext = "." + name.rsplit(".", 1)[-1]
+    data_url = (
+        f"data:{mime_map[ext]};base64," + base64.b64encode(file_bytes).decode("ascii")
+    )
+
+    try:
+        jd_text = await extract_jd_text_from_image(data_url)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=502, detail="图片识别服务调用失败，请稍后重试")
+
+    return await _parse_and_save_job(current_user, jd_text, db)
+
+
+async def _parse_and_save_job(
+    current_user: User, jd_text: str, db: AsyncSession
+) -> JobAnalysis:
+    """核心解析逻辑：调用 LLM 解析 JD → 存储结果与技能要求。"""
+    parsed: JDParsedResult = await parse_jd(jd_text)
 
     job = JobAnalysis(
         user_id=current_user.id,
-        jd_text=payload.jd_text,
+        jd_text=jd_text,
         parsed_json=parsed.model_dump(),
     )
     db.add(job)

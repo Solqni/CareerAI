@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { parseJobDescription, getJobs, createJob, type Job } from '@/api/job'
+import { parseJobDescription, parseJobImage, getJobs, createJob, type Job } from '@/api/job'
 
 export const useJobStore = defineStore('job', () => {
   const jobs = ref<Job[]>([])
@@ -40,6 +40,30 @@ export const useJobStore = defineStore('job', () => {
       return result
     } catch (err: any) {
       error.value = err.response?.data?.detail || err.message || '解析失败'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // 上传 JD 截图，视觉模型识别后解析
+  async function parseImageJob(file: File) {
+    try {
+      loading.value = true
+      error.value = ''
+      const result = await parseJobImage(file)
+
+      currentJob.value = {
+        id: result.data.id ?? Date.now(),
+        title: result.data.parsed_json?.position_title || '未命名岗位',
+        jd_text: result.data.jd_text || '',
+        parsed_json: result.data.parsed_json,
+        created_at: result.data.created_at || new Date().toISOString()
+      }
+
+      return currentJob.value
+    } catch (err: any) {
+      error.value = err.response?.data?.detail || err.message || '图片识别失败'
       throw err
     } finally {
       loading.value = false
@@ -96,6 +120,7 @@ export const useJobStore = defineStore('job', () => {
     error,
     fetchJobs,
     parseJob,
+    parseImageJob,
     saveJob,
     deleteJob
   }

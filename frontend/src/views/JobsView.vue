@@ -12,6 +12,10 @@ const loading = ref(false)
 const errorMsg = ref('')
 const result = ref<any>(null)
 const editing = ref(false)
+const imageInput = ref<HTMLInputElement | null>(null)
+const imageLoading = ref(false)
+const imageName = ref('')
+const imagePreview = ref('')
 
 // 初始化时获取已保存的岗位
 onMounted(async () => {
@@ -40,6 +44,48 @@ async function handleParse() {
   } finally {
     loading.value = false
   }
+}
+
+// ===== JD 截图上传识别 =====
+function onImageChange(e: Event) {
+  const target = e.target as HTMLInputElement
+  if (target.files && target.files[0]) handleImageUpload(target.files[0])
+}
+
+function onImageDrop(e: DragEvent) {
+  e.preventDefault()
+  const file = e.dataTransfer?.files?.[0]
+  if (!file) return
+  if (file.type.startsWith('image/')) {
+    handleImageUpload(file)
+  } else {
+    errorMsg.value = '请上传图片文件（JPG / PNG / WebP / BMP）'
+  }
+}
+
+async function handleImageUpload(file: File) {
+  imageLoading.value = true
+  errorMsg.value = ''
+  result.value = null
+  imageName.value = file.name
+  imagePreview.value = URL.createObjectURL(file)
+  try {
+    await jobStore.parseImageJob(file)
+    if (jobStore.currentJob) {
+      result.value = jobStore.currentJob.parsed_json
+      jdText.value = jobStore.currentJob.jd_text
+    }
+  } catch (e: any) {
+    errorMsg.value = e.response?.data?.detail || e.message || '图片识别失败'
+  } finally {
+    imageLoading.value = false
+  }
+}
+
+function clearImage() {
+  imageName.value = ''
+  imagePreview.value = ''
+  if (imageInput.value) imageInput.value.value = ''
 }
 
 // 保存岗位分析
@@ -73,7 +119,7 @@ async function handleSave() {
       </div>
       <div>
         <h2>岗位分析</h2>
-        <p>粘贴目标岗位 JD，AI 提取岗位职责、必备技能、加分项与学历要求</p>
+        <p>上传 JD 截图或粘贴文本，AI 提取岗位职责、必备技能、加分项与学历要求</p>
       </div>
     </div>
 
@@ -83,11 +129,41 @@ async function handleSave() {
       <div class="tip"><strong>加分项</strong>识别优先条件</div>
     </div>
 
+    <!-- JD 截图上传 -->
+    <div v-if="!imagePreview" class="image-upload-zone anim-fade-up anim-delay-1"
+      @click="imageInput?.click()"
+      @dragover.prevent
+      @drop="onImageDrop"
+    >
+      <input ref="imageInput" type="file" accept=".jpg,.jpeg,.png,.webp,.bmp" hidden @change="onImageChange" />
+      <div class="image-upload-inner">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <circle cx="8.5" cy="8.5" r="1.5" />
+          <path d="M21 15l-5-5L5 21" />
+        </svg>
+        <p>上传 JD 截图，AI 直接识别图中文字：拖拽图片到此处，或 <span class="link">点击上传</span></p>
+        <small>支持 JPG / PNG / WebP / BMP，大小不超过 10MB，识别后自动解析</small>
+      </div>
+    </div>
+
+    <div v-else class="image-preview-card anim-fade-up anim-delay-1">
+      <img :src="imagePreview" alt="JD 截图预览" />
+      <div class="image-preview-info">
+        <strong>{{ imageName }}</strong>
+        <p v-if="imageLoading" class="recognizing"><span class="spinner dark"></span>AI 正在识别图片中的职位信息...</p>
+        <p v-else>识别完成，JD 文字已填入下方文本框</p>
+      </div>
+      <button class="remove-image-btn" :disabled="imageLoading" title="移除图片" @click="clearImage">✕</button>
+    </div>
+
+    <div class="divider anim-fade-up anim-delay-2"><span>或直接粘贴 JD 文本</span></div>
+
     <div class="editor-wrap anim-fade-up anim-delay-2">
       <textarea v-model="jdText" placeholder="在此粘贴目标岗位的 JD 描述...&#10;&#10;例如：岗位职责、任职要求、薪资范围等"></textarea>
       <div class="editor-meta">
         <span>{{ jdText.length }} 字 · JD 过短可能影响解析质量</span>
-        <button class="btn" :disabled="loading || !jdText.trim()" @click="handleParse">
+        <button class="btn" :disabled="loading || imageLoading || !jdText.trim()" @click="handleParse">
           <span v-if="loading" class="spinner"></span>
           {{ loading ? 'AI 解析中...' : '解析 JD' }}
         </button>
@@ -223,6 +299,90 @@ async function handleSave() {
 .header-icon svg { width: 28px; height: 28px; }
 .page-header h2 { font-size: 1.5rem; color: #1a202c; }
 .page-header p { font-size: 0.9rem; color: #718096; margin-top: 0.25rem; }
+
+/* JD 截图上传 */
+.image-upload-zone {
+  border: 2px dashed rgba(118,75,162,0.35);
+  border-radius: 16px;
+  background: rgba(255,255,255,0.6);
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+  cursor: pointer;
+  margin-bottom: 1.4rem;
+}
+.image-upload-zone:hover {
+  border-color: #764ba2;
+  background: rgba(255,255,255,0.8);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(118,75,162,0.12);
+}
+.image-upload-inner { padding: 1.8rem; text-align: center; color: #718096; }
+.image-upload-inner svg {
+  width: 40px; height: 40px;
+  color: #d8b4fe;
+  margin-bottom: 0.6rem;
+  animation: float 3.5s ease-in-out infinite;
+}
+.image-upload-inner p { font-size: 0.92rem; color: #4a5568; }
+.image-upload-inner .link { color: #764ba2; font-weight: 600; }
+.image-upload-inner small { display: block; margin-top: 0.4rem; font-size: 0.78rem; color: #a0aec0; }
+
+.image-preview-card {
+  display: flex; align-items: center; gap: 1rem;
+  padding: 0.9rem 1.1rem;
+  margin-bottom: 1.4rem;
+  background: rgba(255,255,255,0.75);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(118,75,162,0.25);
+  border-radius: 14px;
+}
+.image-preview-card img {
+  width: 86px; height: 64px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  flex-shrink: 0;
+}
+.image-preview-info { flex: 1; min-width: 0; }
+.image-preview-info strong {
+  display: block;
+  font-size: 0.9rem; color: #1a202c;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.image-preview-info p { margin-top: 0.25rem; font-size: 0.8rem; color: #718096; }
+.image-preview-info .recognizing { display: flex; align-items: center; gap: 0.45rem; color: #764ba2; }
+.remove-image-btn {
+  width: 30px; height: 30px;
+  border: none;
+  border-radius: 8px;
+  background: #f1f5f9;
+  color: #718096;
+  font-size: 0.9rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+.remove-image-btn:hover:not(:disabled) { background: #fed7d7; color: #c53030; }
+.remove-image-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.spinner.dark {
+  border: 2px solid rgba(118,75,162,0.25);
+  border-top-color: #764ba2;
+  width: 13px; height: 13px;
+}
+
+/* 分隔线 */
+.divider {
+  display: flex; align-items: center; gap: 1rem;
+  margin: 0 0 1.4rem;
+  color: #a0aec0;
+  font-size: 0.82rem;
+}
+.divider::before, .divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #e2e8f0;
+}
 
 /* 提示卡片 */
 .tips { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.8rem; margin-bottom: 1.4rem; }
