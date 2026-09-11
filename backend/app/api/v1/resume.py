@@ -225,4 +225,5 @@ async def get_profile(
         skills=skills,
         experiences=exp_list,
         summary=(parsed or {}).get("summary") or "暂无简历数据，请先上传或解析简历",
+        parsed_json=parsed,
     )

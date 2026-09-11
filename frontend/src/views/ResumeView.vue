@@ -16,6 +16,39 @@ const fileInput = ref<HTMLInputElement | null>(null)
 const editing = ref(false)
 const showDetailed = ref(false)
 
+// 从 profile 构造展示数据：优先使用 parsed_json 全量解析结果，回退到合并字段
+function buildResult() {
+  const profile = resumeStore.profile
+  if (!profile) return null
+  const pj = profile.parsed_json
+  if (pj && (pj.skills?.length || pj.experiences?.length)) {
+    return {
+      name: pj.name || profile.username,
+      email: pj.email || profile.email,
+      phone: pj.phone || profile.phone,
+      summary: pj.summary || profile.summary,
+      skills: pj.skills,
+      experiences: pj.experiences,
+      education: pj.education,
+      certificates: pj.certificates || [],
+      awards: pj.awards || [],
+      languages: pj.languages || [],
+      job_intention: pj.job_intention || null,
+      highlights: pj.highlights || [],
+      analysis: pj.analysis || null
+    }
+  }
+  return {
+    name: profile.username,
+    email: profile.email,
+    phone: profile.phone,
+    summary: profile.summary,
+    skills: profile.skills,
+    experiences: profile.experiences_details,
+    education: profile.education_details
+  }
+}
+
 async function handleParse() {
   if (!resumeText.value.trim()) return
   loading.value = true
@@ -23,18 +56,7 @@ async function handleParse() {
   result.value = null
   try {
     await resumeStore.parseResume(resumeText.value)
-    // 解析成功，显示用户数据
-    if (resumeStore.profile) {
-      result.value = {
-        name: resumeStore.profile.username,
-        email: resumeStore.profile.email,
-        phone: resumeStore.profile.phone,
-        summary: resumeStore.profile.summary,
-        skills: resumeStore.profile.skills,
-        experiences: resumeStore.profile.experiences_details,
-        education: resumeStore.profile.education_details
-      }
-    }
+    result.value = buildResult()
   } catch (e: any) {
     errorMsg.value = e.response?.data?.detail || e.message || '解析失败'
   } finally {
@@ -64,18 +86,7 @@ async function handleUpload(file: File) {
   result.value = null
   try {
     await resumeStore.uploadFile(file)
-    // 上传成功，显示用户数据
-    if (resumeStore.profile) {
-      result.value = {
-        name: resumeStore.profile.username,
-        email: resumeStore.profile.email,
-        phone: resumeStore.profile.phone,
-        summary: resumeStore.profile.summary,
-        skills: resumeStore.profile.skills,
-        experiences: resumeStore.profile.experiences_details,
-        education: resumeStore.profile.education_details
-      }
-    }
+    result.value = buildResult()
   } catch (e: any) {
     errorMsg.value = e.response?.data?.detail || e.message || '上传解析失败'
   } finally {
@@ -106,18 +117,7 @@ async function handleUpdate() {
 onMounted(async () => {
   try {
     await resumeStore.fetchProfile()
-    // 如果已有简历数据，显示在页面上
-    if (resumeStore.profile && resumeStore.profile.skills) {
-      result.value = {
-        name: resumeStore.profile.username,
-        email: resumeStore.profile.email,
-        phone: resumeStore.profile.phone,
-        summary: resumeStore.profile.summary,
-        skills: resumeStore.profile.skills,
-        experiences: resumeStore.profile.experiences_details,
-        education: resumeStore.profile.education_details
-      }
-    }
+    result.value = buildResult()
   } catch (err) {
     console.error('获取简历信息失败:', err)
   }
@@ -242,14 +242,49 @@ onMounted(async () => {
         </div>
       </div>
 
-      <!-- 基本信息（两种视图均显示） -->
-      <div v-if="result.name || result.email || result.phone" class="result-section">
+      <!-- 基本信息（两种视图均显示，含求职意向） -->
+      <div v-if="result.name || result.email || result.phone || result.job_intention" class="result-section">
         <h4>基本信息</h4>
         <div class="info-row">
           <span v-if="result.name"><strong>姓名：</strong>{{ result.name }}</span>
           <span v-if="result.email"><strong>邮箱：</strong>{{ result.email }}</span>
           <span v-if="result.phone"><strong>电话：</strong>{{ result.phone }}</span>
         </div>
+        <div v-if="result.job_intention" class="intention-row">
+          <strong>求职意向：</strong>{{ result.job_intention }}
+        </div>
+      </div>
+
+      <!-- AI 分析：简化视图显示亮点，详细视图补充优势/待提升/综合评价 -->
+      <div v-if="result.highlights?.length || result.analysis" class="result-section analysis-card">
+        <div class="analysis-header">
+          <h4>AI 分析</h4>
+          <span v-if="result.analysis?.estimated_years" class="years-chip">{{ result.analysis.estimated_years }}</span>
+        </div>
+
+        <div v-if="result.highlights?.length" class="analysis-block">
+          <div class="block-title">简历亮点</div>
+          <ul class="highlight-list">
+            <li v-for="(h, i) in (showDetailed ? result.highlights : result.highlights.slice(0, 3))" :key="i">{{ h }}</li>
+          </ul>
+          <button v-if="!showDetailed && result.highlights.length > 3" class="expand-hint" @click="showDetailed = true">
+            查看全部 {{ result.highlights.length }} 条亮点 →
+          </button>
+        </div>
+
+        <template v-if="showDetailed && result.analysis">
+          <div v-if="result.analysis.strengths?.length || result.analysis.weaknesses?.length" class="sw-grid">
+            <div v-if="result.analysis.strengths?.length" class="sw-col strengths">
+              <div class="block-title">核心优势</div>
+              <ul><li v-for="(s, i) in result.analysis.strengths" :key="i">{{ s }}</li></ul>
+            </div>
+            <div v-if="result.analysis.weaknesses?.length" class="sw-col weaknesses">
+              <div class="block-title">待提升</div>
+              <ul><li v-for="(w, i) in result.analysis.weaknesses" :key="i">{{ w }}</li></ul>
+            </div>
+          </div>
+          <p v-if="result.analysis.career_summary" class="career-summary">{{ result.analysis.career_summary }}</p>
+        </template>
       </div>
 
       <!-- 个人概述：简化视图两行截断，详细视图完整显示 -->
@@ -261,14 +296,17 @@ onMounted(async () => {
         </button>
       </div>
 
-      <!-- 技能：简化视图只显示前 8 项技能名，详细视图带熟练度 -->
+      <!-- 技能：简化视图只显示前 8 项技能名，详细视图带分类与熟练度 -->
       <div v-if="result.skills?.length" class="result-section">
         <h4>技能清单</h4>
         <div class="skill-tags">
           <template v-if="showDetailed">
             <span v-for="skill in result.skills" :key="skill.skill_name" class="skill-tag">
               {{ skill.skill_name }}
-              <small>{{ proficiencyLabel(skill.proficiency) }}</small>
+              <small>
+                <em v-if="skill.category" class="skill-cat">{{ skill.category }}</em>
+                {{ proficiencyLabel(skill.proficiency) }}
+              </small>
             </span>
           </template>
           <template v-else>
@@ -302,6 +340,31 @@ onMounted(async () => {
           <strong>{{ edu.school }}</strong>
           <span>{{ edu.degree }} · {{ edu.major }}</span>
           <small v-if="showDetailed && edu.date_range">{{ edu.date_range }}</small>
+        </div>
+      </div>
+
+      <!-- 证书与奖项（详细视图） -->
+      <div v-if="showDetailed && (result.certificates?.length || result.awards?.length)" class="result-section">
+        <h4>证书与奖项</h4>
+        <div v-if="result.certificates?.length" class="cert-tags">
+          <span v-for="(c, i) in result.certificates" :key="'c' + i" class="cert-tag">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/></svg>
+            {{ c }}
+          </span>
+        </div>
+        <ul v-if="result.awards?.length" class="award-list">
+          <li v-for="(a, i) in result.awards" :key="'a' + i">{{ a }}</li>
+        </ul>
+      </div>
+
+      <!-- 语言能力（详细视图） -->
+      <div v-if="showDetailed && result.languages?.length" class="result-section">
+        <h4>语言能力</h4>
+        <div class="cert-tags">
+          <span v-for="(l, i) in result.languages" :key="i" class="cert-tag lang">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            {{ l }}
+          </span>
         </div>
       </div>
 
@@ -746,4 +809,119 @@ onMounted(async () => {
   transition: background 0.2s ease;
 }
 .more-tag:hover { background: #e8eaff; }
+
+/* 求职意向 */
+.intention-row {
+  margin-top: 0.6rem;
+  padding: 0.55rem 0.9rem;
+  background: #f8f7ff;
+  border-left: 3px solid #667eea;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  color: #4a5568;
+}
+.intention-row strong { color: #667eea; }
+
+/* AI 分析卡 */
+.analysis-card {
+  background: linear-gradient(135deg, rgba(102,126,234,0.06), rgba(118,75,162,0.06));
+  border: 1px solid rgba(102,126,234,0.18);
+  border-radius: 12px;
+}
+.analysis-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.analysis-header h4 { margin-bottom: 0; }
+.years-chip {
+  padding: 0.15rem 0.6rem;
+  background: #667eea;
+  color: #fff;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.analysis-block { margin-top: 0.8rem; }
+.block-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #764ba2;
+  margin-bottom: 0.45rem;
+}
+.highlight-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.35rem;
+}
+.highlight-list li {
+  font-size: 0.88rem;
+  color: #2d3748;
+  line-height: 1.55;
+}
+.sw-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.9rem;
+  margin-top: 0.9rem;
+}
+.sw-col {
+  padding: 0.8rem 0.9rem;
+  border-radius: 10px;
+}
+.sw-col ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.3rem;
+}
+.sw-col li { font-size: 0.86rem; line-height: 1.5; }
+.sw-col.strengths { background: rgba(72,187,120,0.08); border: 1px solid rgba(72,187,120,0.2); }
+.sw-col.strengths .block-title { color: #2f855a; }
+.sw-col.strengths li { color: #22543d; }
+.sw-col.weaknesses { background: rgba(237,137,54,0.08); border: 1px solid rgba(237,137,54,0.2); }
+.sw-col.weaknesses .block-title { color: #c05621; }
+.sw-col.weaknesses li { color: #7b341e; }
+.career-summary {
+  margin: 0.9rem 0 0;
+  padding: 0.7rem 0.9rem;
+  background: rgba(255,255,255,0.7);
+  border-radius: 8px;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  color: #4a5568;
+}
+.skill-cat {
+  font-style: normal;
+  margin-right: 0.35rem;
+  padding: 0.05rem 0.4rem;
+  background: #edf2f7;
+  border-radius: 4px;
+  font-size: 0.68rem;
+  color: #718096;
+}
+
+/* 证书与语言 */
+.cert-tags { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.cert-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.8rem;
+  background: #f0fff4;
+  border: 1px solid #9ae6b4;
+  border-radius: 8px;
+  font-size: 0.84rem;
+  color: #22543d;
+}
+.cert-tag svg { width: 14px; height: 14px; flex-shrink: 0; }
+.cert-tag.lang { background: #ebf8ff; border-color: #90cdf4; color: #2a4365; }
+.award-list {
+  margin: 0.6rem 0 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.3rem;
+}
+.award-list li { font-size: 0.86rem; color: #2d3748; line-height: 1.5; }
 </style>
