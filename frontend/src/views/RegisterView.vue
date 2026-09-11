@@ -5,24 +5,28 @@ import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
 const auth = useAuthStore()
+
 const username = ref('')
 const password = ref('')
+const email = ref('')
+const role = ref<'user' | 'admin'>('user')
 const loading = ref(false)
 const error = ref('')
 
-async function handleLogin() {
+async function handleRegister() {
   loading.value = true
   error.value = ''
   try {
-    await auth.login(username.value, password.value)
-    // 根据用户角色跳转到不同页面
-    if (auth.user?.role === 'admin') {
-      router.push('/admin')
-    } else {
-      router.push('/dashboard')
-    }
-  } catch {
-    error.value = '登录失败，请检查用户名和密码'
+    await auth.register({
+      username: username.value,
+      password: password.value,
+      email: email.value,
+      role: role.value
+    })
+    // 注册成功自动登录，直接跳转到首页
+    router.push('/')
+  } catch (err: any) {
+    error.value = err.response?.data?.detail || '注册失败，请检查信息'
   } finally {
     loading.value = false
   }
@@ -55,26 +59,37 @@ async function handleLogin() {
     <!-- 右侧表单区 -->
     <div class="form-side">
       <div class="login-card anim-fade-up">
-        <h2>欢迎回来</h2>
-        <p class="hint">登录你的 CareerAI 账号</p>
-        <form @submit.prevent="handleLogin">
+        <h2>创建账号</h2>
+        <p class="hint">注册你的 CareerAI 账号</p>
+        <form @submit.prevent="handleRegister">
           <div class="field">
             <label>用户名</label>
             <input v-model="username" type="text" placeholder="请输入用户名" required />
           </div>
           <div class="field">
+            <label>邮箱</label>
+            <input v-model="email" type="email" placeholder="请输入邮箱" />
+          </div>
+          <div class="field">
             <label>密码</label>
             <input v-model="password" type="password" placeholder="请输入密码" required />
+          </div>
+          <div class="field">
+            <label>身份</label>
+            <select v-model="role" class="role-select">
+              <option value="user">求职者</option>
+              <option value="admin">管理员</option>
+            </select>
           </div>
           <Transition name="shake-wrap">
             <p v-if="error" class="error">{{ error }}</p>
           </Transition>
           <button type="submit" class="btn" :disabled="loading">
             <span v-if="loading" class="spinner"></span>
-            {{ loading ? '登录中...' : '登 录' }}
+            {{ loading ? '注册中...' : '注 册' }}
           </button>
         </form>
-        <p class="footer-tip">还没有账号？<a href="/register">立即注册</a></p>
+        <p class="footer-tip">已有账号？<a href="/login">立即登录</a></p>
         <button class="back" @click="router.push('/')">← 返回首页</button>
       </div>
     </div>
@@ -169,6 +184,25 @@ async function handleLogin() {
   box-shadow: 0 0 0 4px rgba(102,126,234,0.12);
   transform: translateY(-1px);
 }
+.role-select {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  background: #fff;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 0.5rem center;
+  background-repeat: no-repeat;
+  background-size: 1.5em 1.5em;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+}
+.role-select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(102,126,234,0.12);
+  transform: translateY(-1px);
+}
 .error {
   color: #e53e3e;
   font-size: 0.85rem;
@@ -203,6 +237,11 @@ async function handleLogin() {
   animation: spin 0.7s linear infinite;
 }
 .footer-tip { text-align: center; font-size: 0.82rem; color: #a0aec0; margin-top: 1.4rem; }
+.footer-tip a {
+  color: var(--primary);
+  text-decoration: none;
+}
+.footer-tip a:hover { text-decoration: underline; }
 .back {
   display: block;
   margin: 0.8rem auto 0;

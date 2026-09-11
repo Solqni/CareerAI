@@ -1,14 +1,31 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { parseJobDescription } from '@/api/job'
 import BackButton from '@/components/BackButton.vue'
+import { useJobStore } from '@/stores/job'
 
 const router = useRouter()
+const jobStore = useJobStore()
+
 const jdText = ref('')
 const loading = ref(false)
 const errorMsg = ref('')
 const result = ref<any>(null)
+const editing = ref(false)
+
+// 初始化时获取已保存的岗位
+onMounted(async () => {
+  try {
+    await jobStore.fetchJobs()
+    // 如果有最近的岗位分析，显示它
+    if (jobStore.currentJob) {
+      result.value = jobStore.currentJob.parsed_json
+      jdText.value = jobStore.currentJob.jd_text
+    }
+  } catch (err) {
+    console.error('获取岗位信息失败:', err)
+  }
+})
 
 async function handleParse() {
   if (!jdText.value.trim()) return
@@ -16,12 +33,26 @@ async function handleParse() {
   errorMsg.value = ''
   result.value = null
   try {
-    const res = await parseJobDescription(jdText.value)
-    result.value = res.data.parsed_json
+    await jobStore.parseJob(jdText.value)
+    result.value = jobStore.currentJob?.parsed_json
   } catch (e: any) {
     errorMsg.value = e.response?.data?.detail || e.message || '解析失败'
   } finally {
     loading.value = false
+  }
+}
+
+// 保存岗位分析
+async function handleSave() {
+  try {
+    await jobStore.saveJob({
+      jd_text: jdText.value,
+      parsed_json: result.value
+    })
+    alert('岗位分析已保存')
+    editing.value = false
+  } catch (e: any) {
+    alert(e.response?.data?.detail || '保存失败')
   }
 }
 </script>
@@ -71,7 +102,17 @@ async function handleParse() {
 
     <!-- 解析结果 -->
     <div v-if="result" class="result-card anim-fade-up">
-      <h3>解析结果</h3>
+      <div class="result-header">
+        <h3>岗位分析结果</h3>
+        <button v-if="!editing" class="save-btn" @click="handleSave">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+            <polyline points="17 21 17 13 7 13 7 21"></polyline>
+            <polyline points="7 3 7 8 15 8"></polyline>
+          </svg>
+          保存分析
+        </button>
+      </div>
 
       <!-- 岗位名称 -->
       <div v-if="result.position_title" class="result-section">
@@ -127,12 +168,23 @@ async function handleParse() {
         </div>
       </div>
 
-      <!-- 下一步 -->
-      <div class="next-step">
-        <button class="btn next-btn" @click="router.push('/match')">
-          下一步：能力匹配 →
-        </button>
-        <small>岗位要求已提取，去生成匹配度报告与差距清单</small>
+      <!-- 下一步导航：岗位分析完成后，引导进入能力匹配 -->
+      <div v-if="result" class="next-step anim-fade-up">
+        <div class="next-step-card">
+          <div class="next-step-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+            </svg>
+          </div>
+          <div class="next-step-info">
+            <strong>下一步：能力匹配</strong>
+            <p>对比简历技能与岗位要求，生成差距报告</p>
+          </div>
+          <button class="btn btn-outline" @click="router.push('/match')">
+            前往能力匹配
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+          </button>
+        </div>
       </div>
     </div>
     </div>
@@ -329,17 +381,69 @@ async function handleParse() {
 .req-row { display: flex; flex-wrap: wrap; gap: 1.5rem; font-size: 0.9rem; color: #2d3748; }
 .req-row strong { color: #764ba2; }
 
-/* 下一步 */
-.next-step {
-  margin-top: 1.8rem;
-  padding-top: 1.4rem;
-  border-top: 1px dashed #e2e8f0;
-  text-align: center;
+/* 下一步导航 */
+.next-step { margin-top: 1.8rem; }
+.next-step-card {
+  display: flex; align-items: center; gap: 1rem;
+  padding: 1.2rem 1.4rem;
+  background: linear-gradient(135deg, #eef2ff, #f3e8ff);
+  border: 1px solid #d4d9fc;
+  border-radius: 14px;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
 }
-.next-btn {
-  font-size: 1rem; padding: 0.85rem 2.2rem;
-  background: linear-gradient(135deg, #764ba2, #f093fb);
+.next-step-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(102,126,234,0.12); }
+.next-step-icon {
+  width: 44px; height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
 }
-.next-btn:hover:not(:disabled) { box-shadow: 0 10px 24px rgba(118,75,162,0.35); }
-.next-step small { display: block; margin-top: 0.6rem; font-size: 0.8rem; color: #a0aec0; }
+.next-step-icon svg { width: 22px; height: 22px; }
+.next-step-info { flex: 1; }
+.next-step-info strong { display: block; font-size: 0.95rem; color: #1a202c; margin-bottom: 0.15rem; }
+.next-step-info p { font-size: 0.82rem; color: #718096; }
+.btn-outline {
+  padding: 0.6rem 1.2rem;
+  background: transparent;
+  color: #667eea;
+  border: 1.5px solid #667eea;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+.btn-outline:hover { background: #667eea; color: #fff; }
+.btn-outline svg { width: 16px; height: 16px; }
+
+/* 保存按钮样式 */
+.result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid #edf2f7;
+}
+.result-header h3 { font-size: 1.2rem; color: #1a202c; }
+.save-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  background: linear-gradient(135deg, #43e97b, #38b2ac);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.save-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(67,233,123,0.3); }
+.save-btn svg { width: 16px; height: 16px; }
 </style>

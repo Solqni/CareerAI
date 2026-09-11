@@ -1,0 +1,102 @@
+import { defineStore } from 'pinia'
+import { ref } from 'vue'
+import { parseJobDescription, getJobs, createJob, type Job } from '@/api/job'
+
+export const useJobStore = defineStore('job', () => {
+  const jobs = ref<Job[]>([])
+  const currentJob = ref<Job | null>(null)
+  const loading = ref(false)
+  const error = ref('')
+
+  // 获取用户的所有岗位分析
+  async function fetchJobs() {
+    try {
+      loading.value = true
+      error.value = ''
+      jobs.value = await getJobs()
+    } catch (err: any) {
+      error.value = err.response?.data?.detail || '获取岗位列表失败'
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // 解析岗位描述
+  async function parseJob(jdText: string) {
+    try {
+      loading.value = true
+      error.value = ''
+      const result = await parseJobDescription(jdText)
+
+      // 保存当前解析的岗位
+      currentJob.value = {
+        id: Date.now(),
+        title: result.data.parsed_json.position_title || '未命名岗位',
+        jd_text: jdText,
+        parsed_json: result.data.parsed_json,
+        created_at: new Date().toISOString()
+      }
+
+      return result
+    } catch (err: any) {
+      error.value = err.response?.data?.detail || err.message || '解析失败'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // 保存岗位分析结果
+  async function saveJob(jobData: Partial<Job>) {
+    try {
+      loading.value = true
+      error.value = ''
+
+      if (currentJob.value) {
+        // 更新现有岗位
+        Object.assign(currentJob.value, jobData)
+      } else {
+        // 创建新岗位
+        const newJob = await createJob(jobData)
+        jobs.value.unshift(newJob)
+        currentJob.value = newJob
+      }
+
+      return currentJob.value
+    } catch (err: any) {
+      error.value = err.response?.data?.detail || '保存失败'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // 删除岗位
+  async function deleteJob(jobId: number) {
+    try {
+      loading.value = true
+      error.value = ''
+      // TODO: 实现删除岗位的API调用
+      jobs.value = jobs.value.filter(j => j.id !== jobId)
+      if (currentJob.value?.id === jobId) {
+        currentJob.value = null
+      }
+    } catch (err: any) {
+      error.value = err.response?.data?.detail || '删除失败'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  return {
+    jobs,
+    currentJob,
+    loading,
+    error,
+    fetchJobs,
+    parseJob,
+    saveJob,
+    deleteJob
+  }
+})

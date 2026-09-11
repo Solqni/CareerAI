@@ -33,17 +33,22 @@ async def run_career_agent(db: AsyncSession, user_id: int, job_id: int) -> dict:
     if not report.get("success"):
         return {"report": report, "report_id": None, "plan_id": None}
 
-    # 3. 持久化匹配报告
+    # 3. 持久化匹配报告（String 主键，与匹配分析服务格式一致）
+    from datetime import datetime
+
     match_report = MatchReport(
+        id=f"match_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{user_id}",
         user_id=user_id,
         job_id=job_id,
-        total_score=report.get("overall_score", 0),
+        position_title=report.get("position_title"),
+        skill_match=report.get("skill_match"),
+        experience_match=report.get("experience_match"),
+        education_match=report.get("education_match"),
+        overall_score=report.get("overall_score", 0),
+        gaps_json=report.get("gaps", []),
+        recommendations_json=[],
         summary=report.get("analysis"),
         detail_json={
-            "skill_match": report.get("skill_match"),
-            "experience_match": report.get("experience_match"),
-            "education_match": report.get("education_match"),
-            "gaps": report.get("gaps", []),
             "knowledge_sources": report.get("knowledge_sources", []),
             "agent_errors": report.get("errors", []),
         },
@@ -51,15 +56,17 @@ async def run_career_agent(db: AsyncSession, user_id: int, job_id: int) -> dict:
     db.add(match_report)
     await db.flush()
 
-    # 4. 持久化差距项
+    # 4. 持久化差距项（GapItem: type/severity/description 字段）
     for gap in report.get("gaps", []):
         db.add(
             GapItem(
                 report_id=match_report.id,
-                gap_type=gap.get("gap_type", "skill"),
+                type=gap.get("gap_type", "skill"),
                 skill_name=(gap.get("skill_name") or "综合能力")[:128],
-                priority=gap.get("priority", "medium"),
-                suggested_action=gap.get("suggested_action"),
+                severity=gap.get("priority", "medium"),
+                description=gap.get("suggested_action"),
+                current_level=gap.get("current_level"),
+                target_level=gap.get("target_level"),
             )
         )
 

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试页面</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .error { color: red; }
+        .success { color: green; }
+    </style>
+</head>
+<body>
+    <h1>前端连接测试</h1>
+    <div id="status">正在测试...</div>
+
+    <script>
+        // 测试API连接
+        async function testAPI() {
+            const statusEl = document.getElementById('status');
+
+            try {
+                // 测试健康检查
+                const response = await fetch('/api/v1/health');
+                const data = await response.json();
+
+                statusEl.innerHTML = `
+                    <p class="success">✅ 前端正常！</p>
+                    <p class="success">✅ API代理正常！</p>
+                    <p>响应: ${JSON.stringify(data)}</p>
+                `;
+            } catch (error) {
+                statusEl.innerHTML = `
+                    <p class="error">❌ API连接失败: ${error.message}</p>
+                `;
+            }
+        }
+
+        // 测试Vue组件加载
+        function testVue() {
+            return new Promise((resolve) => {
+                if (typeof Vue !== 'undefined') {
+                    resolve(true);
+                } else {
+                    // 等待Vue加载
+                    setTimeout(() => testVue(), 100);
+                }
+            });
+        }
+
+        // 页面加载完成后测试
+        window.onload = async function() {
+            await testVue();
+            testAPI();
+        };
+    </script>
+</body>
+</html>
