@@ -1,6 +1,8 @@
-﻿from sqlalchemy import JSON, ForeignKey, Integer, String, Text
+from pgvector.sqlalchemy import Vector
+from sqlalchemy import JSON, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.core.config import settings
 from app.models.base import Base
 
 
@@ -36,4 +38,7 @@ class DocumentChunk(Base):
     doc_id: Mapped[int] = mapped_column(ForeignKey("knowledge_document.id"), index=True)
     chunk_index: Mapped[int] = mapped_column(Integer)
     content: Mapped[str] = mapped_column(Text)
+    embedding: Mapped[list[float] | None] = mapped_column(
+        Vector(settings.EMBEDDING_DIMENSIONS), nullable=True
+    )
     embedding_id: Mapped[str | None] = mapped_column(String(128), nullable=True)

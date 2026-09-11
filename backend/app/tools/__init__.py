@@ -1,12 +1,30 @@
-﻿"""Tool Calling 工具集。
+"""Tool Calling 工具集（真实连接 DB / RAG）。
 
-需求要求不少于 4 个具有业务意义的 Tool，真实连接 DB / RAG：
-- parse_resume: 解析简历文本，调用 LLM 提取结构化信息并存入 DB
-- parse_jd: 解析岗位描述，提取岗位要求并存入 DB
-- calculate_match: 查询用户技能与岗位要求，计算匹配度
-- search_knowledge: 在 RAG 知识库中检索
-- generate_plan: 基于差距分析生成学习计划
-- generate_interview_q: 生成面试题
+- resume_reader: 读取用户简历结构化数据（DB）
+- job_analyzer: 获取岗位分析结果与要求（DB）
+- skill_matcher: 计算技能/经验/学历匹配度与差距（规则计算）
+- knowledge_searcher: RAG 知识检索（pgvector）
 
-本目录为占位结构，各工具后续单独实现。
+每个工具同时导出：
+- *_impl 异步实现函数（供 LangGraph 节点直接复用）
+- @tool 包装版本（可被 LLM tool-calling 调用，独立开 DB session）
 """
+
+from app.tools.job_analyzer import analyze_job_impl, job_analyzer
+from app.tools.knowledge_searcher import knowledge_searcher, search_knowledge_impl
+from app.tools.resume_reader import read_resume_impl, resume_reader
+from app.tools.skill_matcher import match_skills_impl, skill_matcher
+
+ALL_TOOLS = [resume_reader, job_analyzer, skill_matcher, knowledge_searcher]
+
+__all__ = [
+    "resume_reader",
+    "read_resume_impl",
+    "job_analyzer",
+    "analyze_job_impl",
+    "skill_matcher",
+    "match_skills_impl",
+    "knowledge_searcher",
+    "search_knowledge_impl",
+    "ALL_TOOLS",
+]

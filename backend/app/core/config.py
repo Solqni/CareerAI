@@ -49,7 +49,8 @@ class Settings(BaseSettings):
     DEEPSEEK_API_KEY: str = ""
     DEEPSEEK_BASE_URL: str = "https://api.deepseek.com"
     DEEPSEEK_CHAT_MODEL: str = "deepseek-chat"
-    DEEPSEEK_EMBEDDING_MODEL: str = "deepseek-embed"
+    DEEPSEEK_EMBEDDING_MODEL: str = "text-embedding-v3"
+    EMBEDDING_DIMENSIONS: int = 1024
     LLM_TEMPERATURE: float = 0.3
     LLM_TIMEOUT: int = 60
 

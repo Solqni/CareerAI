@@ -43,7 +43,12 @@ async def parse_job_endpoint(
         ))
 
     await db.commit()
-    await db.refresh(job)
+    # commit 后关系已过期，重新预加载 requirements（避免序列化时懒加载触发 MissingGreenlet）
+    job = await db.scalar(
+        select(JobAnalysis)
+        .where(JobAnalysis.id == job.id)
+        .options(selectinload(JobAnalysis.requirements))
+    )
     return job
 
 

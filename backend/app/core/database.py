@@ -1,5 +1,6 @@
-﻿from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.config import settings
@@ -40,4 +41,7 @@ async def init_db() -> None:
     from app.models import user, resume, job, match, interview, memory  # noqa: F401
 
     async with engine.begin() as conn:
+        if settings.DATABASE_TYPE == "postgresql":
+            # 启用 pgvector 扩展（向量存储）
+            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         await conn.run_sync(Base.metadata.create_all)
