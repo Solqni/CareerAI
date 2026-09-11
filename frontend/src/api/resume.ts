@@ -31,6 +31,8 @@ export interface Profile {
   experiences: string[]
   experiences_details: ParsedExperience[]
   summary: string | null
+  /** 最新简历解析完整结果（含证书/奖项/语言/求职意向/亮点/分析） */
+  parsed_json?: any
 }
 
 /** 获取用户能力画像（最新简历解析结果 + 技能表合并） */

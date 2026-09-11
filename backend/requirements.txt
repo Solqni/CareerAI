@@ -1,4 +1,4 @@
-﻿# ===== Web 框架 =====
+# ===== Web 框架 =====
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
 python-multipart==0.0.9
@@ -9,8 +9,8 @@ pydantic-settings==2.5.2
 
 # ===== 数据库 =====
 SQLAlchemy[asyncio]==2.0.35
-# asyncpg==0.29.0  # PostgreSQL only — 切回 PostgreSQL 时取消注释
-# pgvector==0.3.3   # 与 numpy 2.x 不兼容，切回 PostgreSQL 时需升级版本
+asyncpg==0.31.0
+pgvector>=0.4.0
 aiosqlite==0.20.0
 
 # ===== 缓存 =====

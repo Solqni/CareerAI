@@ -1,13 +1,14 @@
 from sqlalchemy import Column, Integer, String, Text, JSON, ForeignKey, DateTime, Float
 from app.models.base import Base
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
 
 
 class MatchReport(Base):
     __tablename__ = "match_report"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    # String 主键（格式 match_时间戳_用户ID），与匹配计算服务保持一致
+    id: Mapped[str] = mapped_column(String(100), primary_key=True)
     user_id = Column(Integer, ForeignKey("user.id"), index=True)
     job_id = Column(Integer, ForeignKey("job_analysis.id"), index=True)
     position_title = Column(String(255), nullable=True)
@@ -17,7 +18,8 @@ class MatchReport(Base):
     overall_score = Column(Float, nullable=True)
     gaps_json = Column(JSON, nullable=True)  # 存储 GapItem 列表的 JSON
     recommendations_json = Column(JSON, nullable=True)  # 存储 Recommendation 列表的 JSON
-    created_at = Column(DateTime, default=datetime.utcnow)
+    summary = Column(Text, nullable=True)
+    detail_json = Column(JSON, nullable=True)
     analyzed_at = Column(DateTime, default=datetime.utcnow)
 
     # 关系

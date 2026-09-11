@@ -13,6 +13,16 @@ export function parseJobDescription(jdText: string) {
   return api.post('/jobs/parse', { jd_text: jdText })
 }
 
+// 上传 JD 截图，视觉模型识别后解析
+export function parseJobImage(file: File) {
+  const formData = new FormData()
+  formData.append('file', file)
+  return api.post('/jobs/parse-image', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 180000
+  })
+}
+
 export function getJobs(): Promise<Job[]> {
   return api.get('/jobs').then(r => r.data)
 }

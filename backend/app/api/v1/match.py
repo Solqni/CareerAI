@@ -1,6 +1,7 @@
-﻿from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_user, get_db
 from app.models import User, Resume, JobAnalysis, MatchReport
@@ -38,11 +39,18 @@ async def analyze_match(
     # 计算匹配度
     match_report = await calculate_match_report(resume_result, job_result, db)
 
-    # 保存匹配结果
+    # 保存匹配结果，commit 后重查（带关系预加载，避免懒加载 MissingGreenlet）
     db.add(match_report)
     await db.commit()
-    await db.refresh(match_report)
 
+    match_report = await db.scalar(
+        select(MatchReport)
+        .where(MatchReport.id == match_report.id)
+        .options(
+            selectinload(MatchReport.gaps),
+            selectinload(MatchReport.recommendations),
+        )
+    )
     return match_report
 
 
@@ -72,6 +80,10 @@ async def get_match_detail(
         select(MatchReport)
         .where(MatchReport.id == match_id)
         .where(MatchReport.user_id == current_user.id)
+        .options(
+            selectinload(MatchReport.gaps),
+            selectinload(MatchReport.recommendations),
+        )
     )
     if not result:
         raise HTTPException(status_code=404, detail="匹配报告不存在")

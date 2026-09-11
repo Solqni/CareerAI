@@ -1,6 +1,11 @@
-﻿"""Agent 工作流编排（LangGraph）。
+"""Agent 工作流编排（LangGraph）。
 
-本目录为占位结构，后续实现：
-- career_agent.py: 主 Agent，编排用户任务 → 选择 Tool → 执行 → 结果
-- workflow.py: LangGraph StateGraph 定义
+- state.py: CareerAgentState 状态定义
+- nodes.py: analyze → match → plan → output 四个节点
+- graph.py: StateGraph 编排（career_graph 单例）
 """
+
+from app.agents.graph import build_career_graph, career_graph
+from app.agents.state import CareerAgentState
+
+__all__ = ["CareerAgentState", "career_graph", "build_career_graph"]

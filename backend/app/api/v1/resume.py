@@ -5,8 +5,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user, get_db
 from app.models import Resume, User, UserExperience, UserSkill
 from app.schemas.resume import (
-    ParsedEducation,
-    ParsedExperience,
     ProfileOut,
     ResumeOut,
     ResumeParseRequest,
@@ -224,9 +222,8 @@ async def get_profile(
         email=(parsed or {}).get("email") or current_user.email,
         phone=(parsed or {}).get("phone"),
         education=education_str,
-        education_details=[ParsedEducation(**e) for e in ((parsed or {}).get("education") or []) if isinstance(e, dict)],
         skills=skills,
         experiences=exp_list,
-        experiences_details=[ParsedExperience(**e) for e in ((parsed or {}).get("experiences") or []) if isinstance(e, dict)],
         summary=(parsed or {}).get("summary") or "暂无简历数据，请先上传或解析简历",
+        parsed_json=parsed,
     )
