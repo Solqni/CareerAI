@@ -15,12 +15,7 @@ async function handleLogin() {
   error.value = ''
   try {
     await auth.login(username.value, password.value)
-    // 根据用户角色跳转到不同页面
-    if (auth.user?.role === 'admin') {
-      router.push('/admin')
-    } else {
-      router.push('/dashboard')
-    }
+    router.push('/dashboard')
   } catch {
     error.value = '登录失败，请检查用户名和密码'
   } finally {
@@ -74,7 +69,7 @@ async function handleLogin() {
             {{ loading ? '登录中...' : '登 录' }}
           </button>
         </form>
-        <p class="footer-tip">还没有账号？<a href="/register">立即注册</a></p>
+        <p class="footer-tip">还没有账号？联系管理员开通</p>
         <button class="back" @click="router.push('/')">← 返回首页</button>
       </div>
     </div>

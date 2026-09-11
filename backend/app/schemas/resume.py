@@ -73,14 +73,12 @@ class SkillOut(ORMBase):
 
 
 class ProfileOut(BaseModel):
-    """能力画像：基本信息 + 技能 + 完整结构化经历。"""
+    """能力画像：基本信息 + 技能 + 经历。"""
 
     username: str
     email: str | None = None
     phone: str | None = None
     education: str | None = None
-    education_details: list[ParsedEducation] = Field(default_factory=list)
     skills: list[SkillOut] = []
     experiences: list[str] = []
-    experiences_details: list[ParsedExperience] = Field(default_factory=list)
     summary: str | None = None

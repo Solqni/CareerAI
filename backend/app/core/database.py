@@ -8,18 +8,8 @@ _engine_kwargs = {
     "echo": settings.DEBUG,
     "future": True,
 }
-
-# PostgreSQL优化配置
 if settings.DATABASE_TYPE == "sqlite":
     _engine_kwargs["connect_args"] = {"check_same_thread": False}
-else:
-    # PostgreSQL连接池优化
-    _engine_kwargs.update({
-        "pool_size": 10,
-        "max_overflow": 20,
-        "pool_pre_ping": True,  # 自动检测断开的连接
-        "pool_recycle": 3600,  # 1小时回收连接
-    })
 
 engine = create_async_engine(settings.DATABASE_URL, **_engine_kwargs)
 

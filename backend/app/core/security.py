@@ -1,7 +1,6 @@
 ﻿from datetime import datetime, timedelta, timezone
 from typing import Any
 
-import bcrypt
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
@@ -14,21 +13,11 @@ ALGORITHM = "HS256"
 
 def hash_password(password: str) -> str:
     """密码 bcrypt 哈希。"""
-    # 直接使用bcrypt避免passlib兼容性问题
-    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+    return pwd_context.hash(password)
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    """直接使用bcrypt验证密码"""
-    try:
-        # 直接使用bcrypt验证
-        return bcrypt.checkpw(plain.encode(), hashed.encode())
-    except:
-        # 如果失败，尝试passlib的方式
-        try:
-            return pwd_context.verify(plain, hashed)
-        except:
-            return False
+    return pwd_context.verify(plain, hashed)
 
 
 def create_access_token(subject: str | int, extra: dict[str, Any] | None = None) -> str:

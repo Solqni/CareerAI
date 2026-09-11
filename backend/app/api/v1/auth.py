@@ -1,18 +1,17 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+﻿from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user, get_db
+from app.api.deps import get_db
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models import User
-from app.schemas.user import Token, TokenWithUser, UserCreate, UserLogin, UserOut
+from app.schemas.user import Token, UserCreate, UserLogin, UserOut
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.post("/register", response_model=TokenWithUser, status_code=201)
-async def register(payload: UserCreate, db: AsyncSession = Depends(get_db)) -> TokenWithUser:
-    """注册用户并自动登录，返回 token + 用户信息。"""
+@router.post("/register", response_model=UserOut, status_code=201)
+async def register(payload: UserCreate, db: AsyncSession = Depends(get_db)) -> User:
     existing = await db.scalar(select(User).where(User.username == payload.username))
     if existing:
         raise HTTPException(status_code=400, detail="用户名已存在")
@@ -20,19 +19,11 @@ async def register(payload: UserCreate, db: AsyncSession = Depends(get_db)) -> T
         username=payload.username,
         password_hash=hash_password(payload.password),
         email=payload.email,
-        role=payload.role,
     )
     db.add(user)
     await db.commit()
     await db.refresh(user)
-    token = create_access_token(user.id)
-    return TokenWithUser(access_token=token, user=user)
-
-
-@router.get("/me", response_model=UserOut)
-async def me(current_user: User = Depends(get_current_user)) -> User:
-    """获取当前登录用户信息（含角色）。"""
-    return current_user
+    return user
 
 
 @router.post("/login", response_model=Token)
