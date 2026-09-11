@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { parseJobDescription } from '@/api/job'
 import BackButton from '@/components/BackButton.vue'
 
+const router = useRouter()
 const jdText = ref('')
 const loading = ref(false)
 const errorMsg = ref('')
@@ -123,6 +125,14 @@ async function handleParse() {
           <span v-if="result.education_requirement"><strong>学历：</strong>{{ result.education_requirement }}</span>
           <span v-if="result.experience_requirement"><strong>经验：</strong>{{ result.experience_requirement }}</span>
         </div>
+      </div>
+
+      <!-- 下一步 -->
+      <div class="next-step">
+        <button class="btn next-btn" @click="router.push('/match')">
+          下一步：能力匹配 →
+        </button>
+        <small>岗位要求已提取，去生成匹配度报告与差距清单</small>
       </div>
     </div>
     </div>
@@ -318,4 +328,18 @@ async function handleParse() {
 /* 任职要求 */
 .req-row { display: flex; flex-wrap: wrap; gap: 1.5rem; font-size: 0.9rem; color: #2d3748; }
 .req-row strong { color: #764ba2; }
+
+/* 下一步 */
+.next-step {
+  margin-top: 1.8rem;
+  padding-top: 1.4rem;
+  border-top: 1px dashed #e2e8f0;
+  text-align: center;
+}
+.next-btn {
+  font-size: 1rem; padding: 0.85rem 2.2rem;
+  background: linear-gradient(135deg, #764ba2, #f093fb);
+}
+.next-btn:hover:not(:disabled) { box-shadow: 0 10px 24px rgba(118,75,162,0.35); }
+.next-step small { display: block; margin-top: 0.6rem; font-size: 0.8rem; color: #a0aec0; }
 </style>

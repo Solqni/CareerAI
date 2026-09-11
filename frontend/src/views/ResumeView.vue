@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { parseResumeText, uploadResumeFile } from '@/api/resume'
 import BackButton from '@/components/BackButton.vue'
 
+const router = useRouter()
 const resumeText = ref('')
 const loading = ref(false)
 const errorMsg = ref('')
@@ -166,6 +168,14 @@ const typeLabel = (t: string) => ({ work: '工作经历', internship: '实习经
           <span>{{ edu.degree }} · {{ edu.major }}</span>
           <small v-if="edu.date_range">{{ edu.date_range }}</small>
         </div>
+      </div>
+
+      <!-- 下一步 -->
+      <div class="next-step">
+        <button class="btn next-btn" @click="router.push('/jobs')">
+          下一步：岗位分析 →
+        </button>
+        <small>简历已就绪，去解析目标岗位 JD，对比能力差距</small>
       </div>
     </div>
     </div>
@@ -375,4 +385,14 @@ const typeLabel = (t: string) => ({ work: '工作经历', internship: '实习经
 }
 .edu-item strong { color: #1a202c; }
 .edu-item small { color: #a0aec0; margin-left: auto; }
+
+/* 下一步 */
+.next-step {
+  margin-top: 1.8rem;
+  padding-top: 1.4rem;
+  border-top: 1px dashed #e2e8f0;
+  text-align: center;
+}
+.next-btn { font-size: 1rem; padding: 0.85rem 2.2rem; }
+.next-step small { display: block; margin-top: 0.6rem; font-size: 0.8rem; color: #a0aec0; }
 </style>
