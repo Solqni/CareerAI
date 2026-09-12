@@ -8,7 +8,7 @@ user ← conversation ← message；user ← interview_session ← interview_qa
 
 import logging
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
@@ -60,6 +60,12 @@ async def delete_job_cascade(db: AsyncSession, job_ids: list[int]) -> None:
         await db.execute(delete(Recommendation).where(Recommendation.report_id.in_(report_ids)))
         await db.execute(delete(MatchReport).where(MatchReport.id.in_(report_ids)))
     await db.execute(delete(JobRequirement).where(JobRequirement.job_id.in_(job_ids)))
+    # 岗位可能被面试会话引用（如共享岗位）：解除关联，保留用户面试记录
+    await db.execute(
+        update(InterviewSession)
+        .where(InterviewSession.job_id.in_(job_ids))
+        .values(job_id=None)
+    )
     await db.execute(delete(JobAnalysis).where(JobAnalysis.id.in_(job_ids)))
 
 
