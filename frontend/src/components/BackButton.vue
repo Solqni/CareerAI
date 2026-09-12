@@ -1,15 +1,41 @@
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
+import { computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 
+const route = useRoute()
 const router = useRouter()
 
-function goBack() {
-  // 有浏览历史则返回上一页，否则回到首页
-  if (window.history.state && window.history.state.back) {
-    router.back()
-  } else {
-    router.push('/')
+// 返回目标 = 当前页面所属的上一级功能主页（而非浏览器历史，
+// 避免在子功能之间来回跳：学习计划→报告详情→学习计划…）
+const backTarget = computed(() => {
+  switch (route.name) {
+    // 能力匹配的子功能 → 匹配列表
+    case 'match-new':
+    case 'match-detail':
+    case 'match-plan':
+      return { path: '/match' }
+    // 管理端子页 → 管理总览
+    case 'admin-jobs':
+    case 'admin-rag':
+    case 'admin-settings':
+      return { path: '/admin' }
+    // 一级功能页 → 工作台
+    case 'resume':
+    case 'jobs':
+    case 'match-list':
+    case 'optimize':
+    case 'interview':
+      return { path: '/dashboard' }
+    // 工作台 → 首页
+    case 'dashboard':
+      return { path: '/' }
+    default:
+      return { path: '/' }
   }
+})
+
+function goBack() {
+  router.push(backTarget.value)
 }
 </script>
 
