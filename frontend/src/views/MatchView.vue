@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useJobStore } from '@/stores/job'
 import { useMatchStore } from '@/stores/match'
@@ -40,6 +40,34 @@ function jobTitle(job: any) {
 // 已选中的岗位
 const selectedJob = computed(() => userJobs.value.find(j => j.id === jobId.value))
 
+// 分析等待进度：时间驱动的三阶段模拟（0-8s 计算匹配度 → 8-25s AI 分析 → 25s+ 学习计划）
+const ANALYSIS_STEPS = [
+  { name: '计算匹配度与差距', threshold: 0 },
+  { name: 'AI 综合分析', threshold: 8 },
+  { name: '生成学习计划', threshold: 25 }
+]
+const elapsed = ref(0)
+let timer: number | null = null
+const currentStep = computed(() => {
+  const idx = ANALYSIS_STEPS.reduce(
+    (acc, step, i) => (elapsed.value >= step.threshold ? i : acc),
+    0
+  )
+  return idx + 1 // 1 起始步号
+})
+
+function startTimer() {
+  elapsed.value = 0
+  timer = window.setInterval(() => { elapsed.value += 1 }, 1000)
+}
+function stopTimer() {
+  if (timer !== null) {
+    clearInterval(timer)
+    timer = null
+  }
+}
+onUnmounted(stopTimer)
+
 // 初始化：并行拉取简历列表 + 岗位列表
 onMounted(async () => {
   try {
@@ -71,6 +99,7 @@ async function startAnalysis() {
   try {
     analyzing.value = true
     error.value = ''
+    startTimer()
 
     const report = await matchStore.analyzeMatchData({
       resume_id: resumeId.value,
@@ -84,6 +113,7 @@ async function startAnalysis() {
     console.error('分析匹配度失败:', err)
   } finally {
     analyzing.value = false
+    stopTimer()
   }
 }
 </script>
@@ -147,7 +177,7 @@ async function startAnalysis() {
             <select v-if="userJobs.length" v-model="jobId">
               <option :value="null" disabled>请选择已分析的岗位</option>
               <option v-for="job in userJobs" :key="job.id" :value="job.id">
-                {{ jobTitle(job) }}
+                {{ jobTitle(job) }}{{ job.is_shared ? '（共享）' : '' }}
               </option>
             </select>
             <div v-else class="resume-card missing">
@@ -164,7 +194,14 @@ async function startAnalysis() {
             <h3>目标岗位</h3>
             <div class="selected-items">
               <div class="selected-item">
-                <strong>岗位：</strong>{{ selectedJob ? jobTitle(selectedJob) : '' }}
+                <strong>岗位：</strong>{{ jobTitle(selectedJob) }}
+              </div>
+              <div class="selected-item" v-if="selectedJob.parsed_json?.company || selectedJob.parsed_json?.city">
+                <strong>公司/城市：</strong>
+                {{ selectedJob.parsed_json?.company || '—' }} · {{ selectedJob.parsed_json?.city || '—' }}
+              </div>
+              <div class="selected-item">
+                <strong>来源：</strong>{{ selectedJob.is_shared ? '平台共享' : '自有岗位' }}
               </div>
             </div>
           </div>
@@ -177,6 +214,24 @@ async function startAnalysis() {
             <span v-if="analyzing" class="loading">AI 分析中（含学习计划生成，约需 10-60 秒）...</span>
             <span v-else>开始分析</span>
           </button>
+
+          <!-- 分析进度：三阶段 + 已用时间 -->
+          <div v-if="analyzing" class="progress-panel">
+            <div
+              v-for="(step, index) in ANALYSIS_STEPS"
+              :key="step.name"
+              class="progress-step"
+              :class="{ done: currentStep > index + 1, active: currentStep === index + 1 }"
+            >
+              <span class="step-indicator">
+                <template v-if="currentStep > index + 1">✓</template>
+                <span v-else-if="currentStep === index + 1" class="step-spinner"></span>
+              </span>
+              <span class="step-name">{{ step.name }}</span>
+            </div>
+            <p class="elapsed">已用时 {{ elapsed }}s</p>
+          </div>
+
           <p v-if="error" class="error-text">{{ error }}</p>
         </div>
       </div>
@@ -256,7 +311,31 @@ h2 { font-size: 1.8rem; color: #1a202c; margin-bottom: 0.5rem; }
   background: rgba(255,255,255,0.7); border-radius: 12px; padding: 1rem 1.2rem; margin-bottom: 1.5rem;
 }
 .selected-info h3 { font-size: 1rem; color: #2d3748; margin-bottom: 0.5rem; }
-.selected-item { color: #4a5568; font-size: 0.95rem; }
+.selected-item { color: #4a5568; font-size: 0.95rem; margin-top: 0.25rem; }
+
+/* 分析进度面板 */
+.progress-panel {
+  margin-top: 1.2rem; background: rgba(255,255,255,0.7);
+  border-radius: 12px; padding: 1rem 1.4rem;
+  display: flex; flex-direction: column; gap: 0.6rem;
+}
+.progress-step { display: flex; align-items: center; gap: 0.6rem; }
+.step-indicator {
+  width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: #edf2f7; color: #718096; font-size: 0.8rem; font-weight: 700;
+}
+.progress-step.active .step-indicator { background: rgba(102,126,234,0.12); }
+.progress-step.done .step-indicator { background: #48bb78; color: #fff; }
+.step-spinner {
+  width: 12px; height: 12px; border: 2px solid rgba(102,126,234,0.3);
+  border-top-color: var(--primary); border-radius: 50%;
+  display: inline-block; animation: spin 0.8s linear infinite;
+}
+.step-name { color: #718096; font-size: 0.92rem; }
+.progress-step.active .step-name { color: var(--primary); font-weight: 600; }
+.progress-step.done .step-name { color: #48bb78; }
+.elapsed { color: #a0aec0; font-size: 0.82rem; text-align: center; margin-top: 0.2rem; }
 
 .primary-button {
   background: linear-gradient(135deg, var(--primary), var(--secondary)); color: #fff;

@@ -40,6 +40,9 @@ export interface MatchAnalysisResult {
   education_match: number
   overall_score: number
   summary?: string
+  company?: string | null
+  city?: string | null
+  detail_json?: { analysis_source?: string; rule_summary?: string } | null
   gaps: GapItem[]
   recommendations: Recommendation[]
   created_at: string

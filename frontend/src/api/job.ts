@@ -7,6 +7,8 @@ export interface Job {
   parsed_json?: any
   created_at: string
   position_title?: string
+  is_shared?: boolean
+  is_owner?: boolean
 }
 
 export function parseJobDescription(jdText: string) {

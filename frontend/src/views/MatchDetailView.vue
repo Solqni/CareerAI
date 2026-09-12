@@ -44,6 +44,19 @@ function getGapTypeLabel(type: string) {
     default: return '其他差距'
   }
 }
+
+// AI 综合分析来源（旧报告 detail_json 为空默认显示 AI 生成）
+const analysisSourceLabel = computed(() =>
+  currentMatch.value?.detail_json?.analysis_source === 'rule' ? '规则生成' : 'AI 生成'
+)
+
+// 匹配时间格式化（后端返回无时区的 UTC 时间，补 Z 再转本地时区）
+const analyzedAtLabel = computed(() => {
+  const raw = currentMatch.value?.analyzed_at
+  if (!raw) return ''
+  const iso = /[Zz+]/.test(raw.slice(10)) ? raw : `${raw}Z`
+  return new Date(iso).toLocaleString('zh-CN', { hour12: false, timeZone: 'Asia/Shanghai' })
+})
 </script>
 
 <template>
@@ -93,17 +106,32 @@ function getGapTypeLabel(type: string) {
             </div>
             <div class="match-info">
               <h2>{{ currentMatch.position_title }}</h2>
+              <p
+                class="job-meta"
+                v-if="currentMatch.company || currentMatch.city"
+              >
+                {{ [currentMatch.company, currentMatch.city].filter(Boolean).join(' · ') }}
+              </p>
               <div class="progress-bar">
                 <div class="progress-fill" :style="`width: ${matchProgress}%`"></div>
               </div>
               <span class="match-level" :style="`color: ${matchLevel.color}`">{{ matchLevel.level }}</span>
-              <p class="report-id">报告编号：{{ currentMatch.id }}</p>
+              <p class="report-id">
+                报告编号：{{ currentMatch.id }}
+                <template v-if="analyzedAtLabel"> · 匹配时间：{{ analyzedAtLabel }}</template>
+              </p>
             </div>
           </div>
 
           <!-- AI 综合分析 -->
           <div class="ai-analysis" v-if="currentMatch.summary">
-            <h3>AI 综合分析</h3>
+            <h3>
+              AI 综合分析
+              <span
+                class="source-badge"
+                :class="{ rule: currentMatch.detail_json?.analysis_source === 'rule' }"
+              >{{ analysisSourceLabel }}</span>
+            </h3>
             <p>{{ currentMatch.summary }}</p>
           </div>
 
@@ -237,7 +265,8 @@ function getGapTypeLabel(type: string) {
 .score-number { font-size: 2.8rem; font-weight: 700; line-height: 1; }
 .score-label { font-size: 0.8rem; opacity: 0.9; }
 .match-info { flex: 1; }
-.match-info h2 { font-size: 1.5rem; color: #1a202c; margin-bottom: 0.8rem; }
+.match-info h2 { font-size: 1.5rem; color: #1a202c; margin-bottom: 0.4rem; }
+.job-meta { color: #718096; font-size: 0.95rem; margin-bottom: 0.6rem; }
 .progress-bar { height: 10px; background: #edf2f7; border-radius: 999px; overflow: hidden; margin-bottom: 0.5rem; }
 .progress-fill { height: 100%; background: linear-gradient(90deg, #667eea, #764ba2); border-radius: 999px; transition: width 0.5s ease; }
 .match-level { font-weight: 700; font-size: 1.05rem; }
@@ -250,7 +279,12 @@ function getGapTypeLabel(type: string) {
   padding: 1.2rem 1.5rem;
   margin-bottom: 1.5rem;
 }
-.ai-analysis h3 { font-size: 1.1rem; color: #6d28d9; margin-bottom: 0.5rem; }
+.ai-analysis h3 { font-size: 1.1rem; color: #6d28d9; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem; }
+.source-badge {
+  font-size: 0.72rem; font-weight: 600; color: #8b5cf6;
+  background: rgba(139,92,246,0.12); border-radius: 999px; padding: 0.1rem 0.6rem;
+}
+.source-badge.rule { color: #718096; background: #edf2f7; }
 .ai-analysis p { color: #4a5568; line-height: 1.8; white-space: pre-wrap; }
 
 .dimensions { margin-bottom: 1.8rem; }
