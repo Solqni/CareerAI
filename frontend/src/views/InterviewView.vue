@@ -102,7 +102,7 @@ function fmtDate(iso: string | null | undefined) {
 
 async function scrollToBottom() {
   await nextTick()
-  if (chatBody.value) chatBody.value.scrollTop = chatBody.value.scrollHeight
+  chatBody.value?.scrollTo({ top: chatBody.value.scrollHeight, behavior: 'smooth' })
 }
 
 async function loadHistory() {
@@ -586,7 +586,7 @@ function backToSetup() {
   flex-direction: column;
   gap: 0.8rem;
 }
-.bubble-row { display: flex; animation: bubbleIn 0.45s ease both; }
+.bubble-row { display: flex; animation: bubbleIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
 .bubble-row.user { justify-content: flex-end; }
 .bubble-row.ai { justify-content: flex-start; }
 .bubble {
@@ -618,7 +618,7 @@ function backToSetup() {
   border-left: 4px solid #43e97b;
   border-radius: 12px;
   padding: 0.9rem 1.05rem;
-  animation: bubbleIn 0.45s ease both;
+  animation: bubbleIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .feedback-head { display: flex; align-items: center; gap: 0.7rem; margin-bottom: 0.7rem; }
 .feedback-title { font-size: 0.82rem; font-weight: 700; color: #2d3748; }
@@ -704,6 +704,12 @@ function backToSetup() {
   30% { opacity: 1; transform: translateY(-2px); }
 }
 
+/* 消息入场：淡入 + 上浮 + 轻微缩放 */
+@keyframes bubbleIn {
+  from { opacity: 0; transform: translateY(16px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 /* 总评报告 */
 .report-card {
   align-self: stretch;
@@ -711,7 +717,7 @@ function backToSetup() {
   border: 1px solid rgba(67,233,123,0.3);
   border-radius: 14px;
   padding: 1.2rem 1.3rem;
-  animation: bubbleIn 0.45s ease both;
+  animation: bubbleIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .report-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; }
 .report-head h3 { font-size: 1.05rem; color: #1a202c; }
