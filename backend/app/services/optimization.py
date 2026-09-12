@@ -78,9 +78,14 @@ async def generate_optimization(
     """生成简历优化建议（M4 核心流程）。"""
     from langchain_core.messages import HumanMessage, SystemMessage
 
-    # 1. 校验岗位归属并获取岗位要求（复用 job_analyzer）
+    # 1. 校验岗位可访问（自有或平台共享）并获取岗位要求（复用 job_analyzer）
     job = await db.scalar(
-        select(JobAnalysis).where(JobAnalysis.id == job_id).where(JobAnalysis.user_id == user_id)
+        select(JobAnalysis).where(JobAnalysis.id == job_id).where(
+            or_(
+                JobAnalysis.user_id == user_id,
+                JobAnalysis.is_shared.is_(True),
+            )
+        )
     )
     if not job:
         raise ValueError("岗位不存在或无权访问")
@@ -103,9 +108,46 @@ async def generate_optimization(
     if report and report.gaps_json:
         gap_text = json.dumps(report.gaps_json, ensure_ascii=False)
         report_id = report.id
+        gap_skills = [
+            str(g.get("skill_name"))
+            for g in report.gaps_json
+            if isinstance(g, dict) and g.get("skill_name")
+        ]
     else:
         gap_text = "（该岗位尚无匹配报告，请基于简历与岗位要求直接识别能力差距）"
         report_id = None
+        gap_skills = []
+
+    # 3.5 RAG 检索管理员知识库片段作为优化参考（失败降级不阻断主流程）
+    from app.services.rag import search_knowledge
+
+    knowledge_refs: list[dict] = []
+    knowledge_text = "（知识库暂无相关内容）"
+    try:
+        query = " ".join(
+            [job_data.get("position_title") or "", *gap_skills[:5]]
+        ).strip()
+        if query:
+            hits = await search_knowledge(db, query, top_k=4)
+        else:
+            hits = []
+        if hits:
+            knowledge_refs = [
+                {
+                    "doc_id": h["doc_id"],
+                    "doc_title": h["doc_title"],
+                    "similarity": h["similarity"],
+                }
+                for h in hits
+            ]
+            knowledge_text = "\n\n".join(
+                f"[片段{i + 1}]（来源：{h['doc_title']}）\n{h['content']}"
+                for i, h in enumerate(hits)
+            )
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).exception("优化建议知识库检索失败，忽略知识库参考")
 
     # 4. LLM 生成结构化优化建议
     llm = get_chat_llm()
@@ -138,4 +180,5 @@ async def generate_optimization(
         "resume_id": resume.id,
         "suggestions": suggestions,
         "summary": raw.get("summary"),
+        "knowledge_refs": knowledge_refs,
     }

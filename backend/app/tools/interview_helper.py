@@ -133,6 +133,26 @@ async def generate_interview_q_impl(
     resume_text = (resume.raw_text if resume else "") or ""
     resume_text = resume_text[:_MAX_CONTEXT_CHARS]
 
+    # RAG 检索平台管理员知识库考点，作为技术题出题参考（失败降级不阻断）
+    knowledge_text = "（知识库暂无相关内容）"
+    try:
+        from app.services.rag import search_knowledge
+
+        skill_names = [
+            str(r.get("skill_name"))
+            for r in (job_data.get("requirements") or [])
+            if isinstance(r, dict) and r.get("skill_name")
+        ]
+        query = " ".join([job_data.get("position_title") or "", *skill_names[:5]]).strip()
+        hits = await search_knowledge(db, query, top_k=3) if query else []
+        if hits:
+            knowledge_text = "\n\n".join(
+                f"[片段{i + 1}]（来源：{h['doc_title']}）\n{h['content']}"
+                for i, h in enumerate(hits)
+            )
+    except Exception:
+        logger.exception("面试出题知识库检索失败，忽略知识库参考")
+
     distribution = _category_counts(question_count)
     dist_text = "；".join(
         f"{_CATEGORY_LABEL[cat.value]} {n} 道" for cat, n in distribution if n > 0
@@ -161,6 +181,7 @@ async def generate_interview_q_impl(
                     f"【目标岗位】{job_data.get('position_title') or '未命名岗位'}\n"
                     f"【岗位要求】\n{json.dumps(job_data, ensure_ascii=False, default=str)}\n\n"
                     f"【用户简历摘要】\n{resume_text or '（未提供简历，项目题改为通用项目考察）'}\n\n"
+                    f"【知识库参考（平台管理员知识库考点，技术题尽量结合考察）】\n{knowledge_text}\n\n"
                     f"【题目分配】{dist_text}，共 {question_count} 道"
                 ),
             ]
