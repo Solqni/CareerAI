@@ -196,6 +196,9 @@ const analyzedAtLabel = computed(() => {
 
           <!-- 操作按钮 -->
           <div class="action-buttons">
+            <button @click="router.push({ path: '/interview', query: { jobId: String(currentMatch.job_id) } })" class="secondary-button">
+              进入面试准备
+            </button>
             <button @click="router.push(`/match/plan/${currentMatch.id}`)" class="secondary-button">
               查看学习计划
             </button>
