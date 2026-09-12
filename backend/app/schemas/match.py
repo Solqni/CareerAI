@@ -54,6 +54,9 @@ class MatchOut(ORMBase):
     overall_score: float = Field(..., ge=0, le=100, description="综合评分")
     summary: Optional[str] = Field(None, description="LLM 综合分析文字（失败降级为规则文本）")
     detail_json: Optional[dict] = Field(None, description="分析来源与规则摘要等附加数据")
+    company: Optional[str] = Field(None, description="目标岗位公司（来自岗位 parsed_json）")
+    city: Optional[str] = Field(None, description="目标岗位城市（来自岗位 parsed_json）")
+    analysis_source: Optional[str] = Field(None, description="综合分析来源：llm / rule")
     gaps: List[GapItem] = Field(default_factory=list, description="差距项")
     recommendations: List[Recommendation] = Field(default_factory=list, description="建议")
     learning_plan: List["LearningPlanOut"] = Field(

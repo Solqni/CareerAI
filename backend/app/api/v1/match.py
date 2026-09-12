@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 import logging
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -54,10 +54,18 @@ async def _run_full_match(
     job = await db.scalar(
         select(JobAnalysis)
         .where(JobAnalysis.id == payload.job_id)
-        .where(JobAnalysis.user_id == current_user.id)
+        .where(
+            or_(
+                JobAnalysis.user_id == current_user.id,
+                JobAnalysis.is_shared.is_(True),
+            )
+        )
     )
     if not job:
         raise HTTPException(status_code=404, detail="岗位不存在")
+
+    # commit 后 ORM 关系过期，此处暂存岗位公司/城市，供重查后挂载到报告上
+    job_parsed = job.parsed_json or {}
 
     # 1-3. 匹配计算 + 报告/差距/建议 ORM 构造
     report = await calculate_match_report(resume, job, db)
@@ -87,9 +95,14 @@ async def _run_full_match(
     await db.commit()
 
     # commit 后关系过期，重查（项目约定）
-    return await db.scalar(
+    result = await db.scalar(
         select(MatchReport).where(MatchReport.id == report.id).options(*_REPORT_LOAD)
     )
+    # 挂载岗位公司/城市与分析来源（表无这些列，供 Pydantic from_attributes 读取）
+    result.company = job_parsed.get("company")
+    result.city = job_parsed.get("city")
+    result.analysis_source = (result.detail_json or {}).get("analysis_source")
+    return result
 
 
 @router.post("", response_model=MatchOut)
@@ -142,6 +155,14 @@ async def get_match_detail(
     )
     if not result:
         raise HTTPException(status_code=404, detail="匹配报告不存在")
+
+    # 补充岗位公司/城市（岗位可能已删除，判空不挂载）与分析来源
+    job = await db.scalar(select(JobAnalysis).where(JobAnalysis.id == result.job_id))
+    if job:
+        job_parsed = job.parsed_json or {}
+        result.company = job_parsed.get("company")
+        result.city = job_parsed.get("city")
+    result.analysis_source = (result.detail_json or {}).get("analysis_source")
     return result
 
 
