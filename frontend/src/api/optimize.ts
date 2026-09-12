@@ -26,11 +26,18 @@ export interface OptimizeResponse {
   suggestions: OptimizationSuggestion[]
   summary?: string
   knowledge_refs?: KnowledgeRef[]
+  source?: 'llm' | 'cache'
+  created_at?: string
 }
 
 // 生成简历优化建议（M4：关键词优化/经历量化/内容增强/结构建议）
 // 生成含 LLM 调用与 RAG 检索（实测 10-70s+），超时放宽到 3 分钟
-export function optimizeResume(data: { job_id: number; resume_id?: number }): Promise<OptimizeResponse> {
+// 同岗位请求后端返回缓存报告（source='cache'），refresh=true 强制重新生成
+export function optimizeResume(data: {
+  job_id: number
+  resume_id?: number
+  refresh?: boolean
+}): Promise<OptimizeResponse> {
   return api.post<OptimizeResponse>('/optimize', data, { timeout: 180000 }).then(r => r.data)
 }
 

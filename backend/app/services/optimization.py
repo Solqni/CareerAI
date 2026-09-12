@@ -8,16 +8,17 @@ Agent 根据目标岗位要求对用户简历生成结构化优化建议：
 
 重要原则（需求 3.4）：不得编造用户未提供的经历或技能，所有建议基于真实简历内容。
 实现：调用 LLM 传入简历与岗位要求，Pydantic 定义返回结构并校验（需求 8.3）。
-不新增数据表，优化建议作为独立接口返回。
+结果持久化到 optimize_report 表：同用户同岗位请求命中缓存，refresh=True 强制重新生成。
 """
 
 import json
+from datetime import datetime
 
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.llm.client import get_chat_llm
-from app.models import JobAnalysis, MatchReport, Resume
+from app.models import JobAnalysis, MatchReport, OptimizeReport, Resume
 from app.schemas.optimize import OptimizationSuggestion
 from app.tools.job_analyzer import analyze_job_impl
 
@@ -73,12 +74,20 @@ async def _load_resume(
 
 
 async def generate_optimization(
-    db: AsyncSession, user_id: int, job_id: int, resume_id: int | None = None
+    db: AsyncSession,
+    user_id: int,
+    job_id: int,
+    resume_id: int | None = None,
+    refresh: bool = False,
 ) -> dict:
-    """生成简历优化建议（M4 核心流程）。"""
+    """生成简历优化建议（M4 核心流程）。
+
+    结果持久化到 optimize_report：同用户同岗位再次请求直接返回缓存（source=cache），
+    refresh=True 时强制重新生成并写入新报告。
+    """
     from langchain_core.messages import HumanMessage, SystemMessage
 
-    # 1. 校验岗位可访问（自有或平台共享）并获取岗位要求（复用 job_analyzer）
+    # 1. 校验岗位可访问（自有或平台共享）
     job = await db.scalar(
         select(JobAnalysis).where(JobAnalysis.id == job_id).where(
             or_(
@@ -90,14 +99,36 @@ async def generate_optimization(
     if not job:
         raise ValueError("岗位不存在或无权访问")
 
-    # 2. 校验简历存在
+    # 2. 缓存命中：返回该岗位最近一次生成的优化报告（不重复调 LLM）
+    if not refresh:
+        cached = await db.scalar(
+            select(OptimizeReport)
+            .where(OptimizeReport.user_id == user_id)
+            .where(OptimizeReport.job_id == job_id)
+            .order_by(OptimizeReport.created_at.desc())
+            .limit(1)
+        )
+        if cached:
+            job_title = (job.parsed_json or {}).get("position_title")
+            return {
+                "job_id": job_id,
+                "position_title": job_title,
+                "resume_id": cached.resume_id,
+                "suggestions": cached.suggestions_json or [],
+                "summary": cached.summary,
+                "knowledge_refs": cached.knowledge_refs_json or [],
+                "source": "cache",
+                "created_at": cached.created_at.isoformat() if cached.created_at else None,
+            }
+
+    # 3. 校验简历存在
     resume = await _load_resume(db, user_id, resume_id)
     if not resume:
         raise ValueError("未找到简历，请先上传并解析简历")
 
     job_data = await analyze_job_impl(db, job_id)
 
-    # 3. 取最近一次人岗匹配的能力差距清单，作为优化上下文（需求 3.4：结合能力差距分析）
+    # 4. 取最近一次人岗匹配的能力差距清单，作为优化上下文（需求 3.4：结合能力差距分析）
     report = await db.scalar(
         select(MatchReport)
         .where(MatchReport.user_id == user_id)
@@ -118,7 +149,7 @@ async def generate_optimization(
         report_id = None
         gap_skills = []
 
-    # 3.5 RAG 检索管理员知识库片段作为优化参考（失败降级不阻断主流程）
+    # 4.5 RAG 检索管理员知识库片段作为优化参考（失败降级不阻断主流程）
     from app.services.rag import search_knowledge
 
     knowledge_refs: list[dict] = []
@@ -149,7 +180,7 @@ async def generate_optimization(
 
         logging.getLogger(__name__).exception("优化建议知识库检索失败，忽略知识库参考")
 
-    # 4. LLM 生成结构化优化建议
+    # 5. LLM 生成结构化优化建议
     llm = get_chat_llm()
     resume_text = (resume.raw_text or "")[:_MAX_RESUME_CHARS]
     resp = await llm.ainvoke(
@@ -166,13 +197,28 @@ async def generate_optimization(
     content = resp.content if isinstance(resp.content, str) else str(resp.content)
     raw = _extract_json(content)
 
-    # 5. Pydantic 校验（需求 8.3 结构化输出），非法条目丢弃
+    # 6. Pydantic 校验（需求 8.3 结构化输出），非法条目丢弃
     suggestions: list[dict] = []
     for item in raw.get("suggestions", []):
         try:
             suggestions.append(OptimizationSuggestion(**item).model_dump(mode="json"))
         except Exception:
             continue
+
+    # 7. 持久化优化报告（同岗位下次请求直接命中缓存）
+    now = datetime.utcnow()
+    db.add(
+        OptimizeReport(
+            user_id=user_id,
+            job_id=job_id,
+            resume_id=resume.id,
+            suggestions_json=suggestions,
+            summary=raw.get("summary"),
+            knowledge_refs_json=knowledge_refs or None,
+            created_at=now,
+        )
+    )
+    await db.commit()
 
     return {
         "job_id": job_id,
@@ -181,4 +227,6 @@ async def generate_optimization(
         "suggestions": suggestions,
         "summary": raw.get("summary"),
         "knowledge_refs": knowledge_refs,
+        "source": "llm",
+        "created_at": now.isoformat(),
     }

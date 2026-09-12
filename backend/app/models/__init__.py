@@ -11,6 +11,7 @@ from app.models.match import (
     Recommendation,
 )
 from app.models.interview import InterviewQA, InterviewSession
+from app.models.optimize import OptimizeReport
 from app.models.memory import (
     Conversation,
     DocumentChunk,
@@ -34,6 +35,7 @@ __all__ = [
     "LearningTask",
     "InterviewSession",
     "InterviewQA",
+    "OptimizeReport",
     "Conversation",
     "Message",
     "KnowledgeDocument",

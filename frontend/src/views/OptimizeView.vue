@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useJobStore } from '@/stores/job'
 import { optimizeResume, dimensionMeta, type OptimizeResponse } from '@/api/optimize'
@@ -30,7 +30,21 @@ onMounted(async () => {
   }
 })
 
-async function generate() {
+// 切换岗位后清空旧结果，避免展示错岗位的建议
+watch(jobId, () => {
+  result.value = null
+  error.value = ''
+})
+
+// isCache：结果来自历史报告缓存（下次进来同一岗位直接可看）
+const isCache = computed(() => result.value?.source === 'cache')
+
+function formatTime(iso?: string) {
+  if (!iso) return ''
+  return new Date(iso).toLocaleString('zh-CN', { hour12: false })
+}
+
+async function generate(refresh = false) {
   if (!jobId.value) {
     error.value = '请选择目标岗位'
     return
@@ -38,7 +52,7 @@ async function generate() {
   try {
     loading.value = true
     error.value = ''
-    result.value = await optimizeResume({ job_id: jobId.value })
+    result.value = await optimizeResume({ job_id: jobId.value, refresh })
   } catch (err: any) {
     error.value = err.response?.data?.detail || '优化建议生成失败'
     console.error('优化建议生成失败:', err)
@@ -95,7 +109,7 @@ function goMatch() {
               </option>
             </select>
           </div>
-          <button @click="generate" :disabled="loading || !jobId" class="primary-button">
+          <button @click="generate(false)" :disabled="loading || !jobId" class="primary-button">
             <span v-if="loading" class="loading">AI 分析中，约需 1-2 分钟...</span>
             <span v-else>生成优化建议</span>
           </button>
@@ -105,7 +119,16 @@ function goMatch() {
         <!-- 结果 -->
         <template v-if="result">
           <div class="result-head">
-            <h3>优化建议 <span class="target">· {{ result.position_title }}</span></h3>
+            <h3>
+              优化建议 <span class="target">· {{ result.position_title }}</span>
+              <span v-if="isCache" class="cache-badge">
+                历史报告 · 生成于 {{ formatTime(result.created_at) }}
+              </span>
+            </h3>
+            <button class="regen-btn" :disabled="loading" @click="generate(true)">
+              <span v-if="loading" class="loading">AI 重新生成中...</span>
+              <span v-else>重新生成</span>
+            </button>
             <p v-if="result.summary" class="summary">{{ result.summary }}</p>
           </div>
 
@@ -221,7 +244,32 @@ h2 { font-size: 1.8rem; color: #1a202c; margin-bottom: 0.5rem; }
 }
 .error-text { color: #ef4444; margin-top: 0.8rem; font-size: 0.9rem; }
 
-.result-head h3 { font-size: 1.4rem; color: #1a202c; margin-bottom: 0.5rem; }
+.result-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin-bottom: 1rem; }
+.result-head h3 { font-size: 1.4rem; color: #1a202c; margin-bottom: 0; margin-right: auto; }
+.cache-badge {
+  display: inline-block;
+  vertical-align: 2px;
+  margin-left: 0.5rem;
+  padding: 0.15rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: #b7791f;
+  background: #fefcbf;
+  border: 1px solid #f6e05e;
+  border-radius: 999px;
+}
+.regen-btn {
+  padding: 0.45rem 1rem;
+  border: 1px solid #cbd5e0;
+  background: #fff;
+  color: #4a5568;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.regen-btn:hover:not(:disabled) { border-color: #667eea; color: #667eea; }
+.regen-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 .target { color: #7c3aed; font-weight: 700; }
 .summary { color: #4a5568; background: rgba(139,92,246,0.08); border-radius: 12px; padding: 1rem 1.2rem; line-height: 1.7; margin-bottom: 1.5rem; }
 

@@ -2,7 +2,7 @@
 
 POST /api/v1/optimize：输入目标岗位（可选指定简历），Agent 结合岗位要求与简历内容
 调用 LLM 生成结构化优化建议（关键词优化 / 经历量化 / 内容增强 / 结构建议）。
-不新增数据表，建议作为独立接口返回（需求 4.1 无对应表）。
+结果持久化到 optimize_report 表：同岗位再次请求直接返回缓存，refresh=True 强制重新生成。
 """
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -25,7 +25,7 @@ async def optimize_resume(
     """生成简历优化建议：关键词补充、经历量化、能力短板增强、结构建议。"""
     try:
         result = await generate_optimization(
-            db, current_user.id, payload.job_id, payload.resume_id
+            db, current_user.id, payload.job_id, payload.resume_id, payload.refresh
         )
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))

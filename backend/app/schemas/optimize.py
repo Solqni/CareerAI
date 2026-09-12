@@ -22,6 +22,7 @@ class OptimizeRequest(BaseModel):
     """简历优化请求"""
     job_id: int = Field(..., description="目标岗位ID（已解析的 job_analysis）")
     resume_id: Optional[int] = Field(None, description="简历ID，缺省取用户最新简历")
+    refresh: bool = Field(False, description="True 时忽略缓存强制重新生成")
 
 
 class OptimizationSuggestion(BaseModel):
@@ -49,3 +50,5 @@ class OptimizeResponse(BaseModel):
     knowledge_refs: List[KnowledgeRef] = Field(
         default_factory=list, description="RAG 检索引用的知识库来源"
     )
+    source: str = Field("llm", description="llm=新生成；cache=历史报告缓存")
+    created_at: Optional[str] = Field(None, description="报告生成时间（缓存时为首次生成时间）")
