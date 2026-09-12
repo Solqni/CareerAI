@@ -1,16 +1,8 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import BackButton from '@/components/BackButton.vue'
-
-const router = useRouter()
+import { getSystemInfo, listUsers, updateUserRole, type AdminUser, type SystemInfo } from '@/api/admin'
 
 const settings = ref({
-  system: {
-    name: 'CareerAI',
-    version: '1.0.0',
-    status: '运行中'
-  },
   database: {
     type: 'PostgreSQL',
     status: '连接正常',
@@ -29,29 +21,45 @@ const settings = ref({
   }
 })
 
-const users = ref([])
+const systemStats = ref<SystemInfo | null>(null)
+const users = ref<AdminUser[]>([])
 const loading = ref(true)
 const error = ref('')
 
-// 获取系统信息
+// 获取系统统计（真实数据）
 const fetchSystemInfo = async () => {
   try {
-    // TODO: 实现从后端获取系统信息的API调用
-    loading.value = false
-  } catch (err) {
-    error.value = '获取系统信息失败'
+    systemStats.value = await getSystemInfo()
+  } catch (err: any) {
+    error.value = err.response?.data?.detail || '获取系统信息失败'
+    console.error('获取系统信息失败:', err)
+  }
+}
+
+// 获取用户列表（真实数据）
+const fetchUsers = async () => {
+  try {
+    error.value = ''
+    users.value = await listUsers()
+  } catch (err: any) {
+    error.value = err.response?.data?.detail || '获取用户列表失败'
+    console.error('获取用户列表失败:', err)
+  } finally {
     loading.value = false
   }
 }
 
-// 获取用户列表
-const fetchUsers = async () => {
+// 修改用户角色
+const handleSetRole = async (user: AdminUser, role: 'user' | 'admin') => {
+  if (user.role === role) return
+
   try {
-    // TODO: 实现从后端获取用户列表的API调用
-    loading.value = false
-  } catch (err) {
-    error.value = '获取用户列表失败'
-    loading.value = false
+    await updateUserRole(user.id, role)
+    showAlert(`已将用户「${user.username}」的角色更新为 ${role === 'admin' ? '管理员' : '普通用户'}`)
+    await fetchUsers()
+  } catch (err: any) {
+    error.value = err.response?.data?.detail || '角色更新失败'
+    console.error('角色更新失败:', err)
   }
 }
 
@@ -60,57 +68,36 @@ const showAlert = (message: string) => {
   alert(message)
 }
 
-onMounted(() => {
-  fetchSystemInfo()
-  fetchUsers()
+onMounted(async () => {
+  await Promise.all([fetchSystemInfo(), fetchUsers()])
 })
 </script>
 
 <template>
   <div class="admin-settings-page">
-    <div class="page-bg"></div>
-    <div class="page-blob blob-a"></div>
-    <div class="page-blob blob-b"></div>
-
-    <header class="topbar anim-fade">
-      <div class="topbar-left">
-        <BackButton class="topbar-back" />
-        <div class="brand" @click="router.push('/')">
-          <div class="brand-logo">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-            </svg>
-          </div>
-          <span>CareerAI</span>
-        </div>
-      </div>
-      <nav>
-        <button @click="router.push('/admin')">管理员控制台</button>
-        <button @click="router.push('/admin/jobs')">岗位管理</button>
-        <button @click="router.push('/admin/rag')">RAG 知识库</button>
-        <button @click="router.push('/logout')">退出登录</button>
-      </nav>
-    </header>
-
     <main class="content">
       <h2 class="page-title anim-fade-up">系统设置</h2>
       <p class="page-sub anim-fade-up anim-delay-1">配置系统和管理用户</p>
 
-      <!-- 系统信息 -->
+      <!-- 系统信息（真实统计） -->
       <div class="settings-section anim-fade-up anim-delay-2">
         <h3>系统信息</h3>
         <div class="settings-grid">
           <div class="setting-item">
-            <label>系统名称</label>
-            <p>{{ settings.system.name }}</p>
+            <label>用户数</label>
+            <p>{{ systemStats?.user_count ?? '—' }}</p>
           </div>
           <div class="setting-item">
-            <label>版本</label>
-            <p>{{ settings.system.version }}</p>
+            <label>岗位分析数</label>
+            <p>{{ systemStats?.job_count ?? '—' }}</p>
           </div>
           <div class="setting-item">
-            <label>状态</label>
-            <span class="status-badge success">{{ settings.system.status }}</span>
+            <label>匹配报告数</label>
+            <p>{{ systemStats?.match_report_count ?? '—' }}</p>
+          </div>
+          <div class="setting-item">
+            <label>知识库文档数</label>
+            <p>{{ systemStats?.knowledge_doc_count ?? '—' }}</p>
           </div>
         </div>
       </div>
@@ -176,17 +163,10 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- 用户管理 -->
+      <!-- 用户管理（真实数据） -->
       <div class="settings-section anim-fade-up anim-delay-6">
         <div class="section-header">
           <h3>用户管理</h3>
-          <button class="add-user-btn" @click="showAlert('添加新用户功能开发中')">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <line x1="12" y1="5" x2="12" y2="19"></line>
-              <line x1="5" y1="12" x2="19" y2="12"></line>
-            </svg>
-            添加用户
-          </button>
         </div>
 
         <div v-if="loading" class="loading">
@@ -210,7 +190,45 @@ onMounted(() => {
             <p class="hint">添加第一个用户开始使用系统</p>
           </div>
 
-          <!-- TODO: 实现用户表格渲染 -->
+          <table v-else class="table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>用户名</th>
+                <th>邮箱</th>
+                <th>角色</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="user in users" :key="user.id">
+                <td>{{ user.id }}</td>
+                <td class="username">{{ user.username }}</td>
+                <td>{{ user.email || '—' }}</td>
+                <td>
+                  <span class="role-badge" :class="user.role">
+                    {{ user.role === 'admin' ? '管理员' : '普通用户' }}
+                  </span>
+                </td>
+                <td>
+                  <button
+                    v-if="user.role === 'user'"
+                    class="role-btn promote"
+                    @click="handleSetRole(user, 'admin')"
+                  >
+                    设为管理员
+                  </button>
+                  <button
+                    v-else
+                    class="role-btn demote"
+                    @click="handleSetRole(user, 'user')"
+                  >
+                    设为普通用户
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </main>
@@ -218,66 +236,10 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.admin-settings-page { min-height: 100vh; position: relative; overflow: hidden; }
-.page-bg {
-  position: fixed; inset: 0; z-index: -2;
-  background: linear-gradient(-45deg, #667eea, #764ba2, #f093fb, #4facfe);
-  background-size: 400% 400%;
-  animation: gradientShift 12s ease infinite;
-}
-.page-blob {
-  position: fixed; border-radius: 50%; filter: blur(70px); z-index: -1;
-  animation: float 8s ease-in-out infinite;
-}
-.blob-a { width: 320px; height: 320px; background: #667eea; opacity: 0.1; top: -60px; left: -40px; }
-.blob-b { width: 280px; height: 280px; background: #f093fb; opacity: 0.08; bottom: -40px; right: -30px; animation-delay: -4s; }
-
-/* 顶栏 */
-.topbar {
-  background: rgba(255,255,255,0.7);
-  backdrop-filter: blur(16px);
-  padding: 0.9rem 2rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  box-shadow: 0 2px 16px rgba(0,0,0,0.06);
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  border-bottom: 1px solid rgba(255,255,255,0.5);
-}
-.brand { display: flex; align-items: center; gap: 0.6rem; font-weight: 800; font-size: 1.15rem; cursor: pointer; }
-.topbar-left { display: flex; align-items: center; gap: 0.9rem; }
-.brand-logo {
-  width: 36px; height: 36px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, var(--primary), var(--secondary));
-  color: #fff;
-  display: flex; align-items: center; justify-content: center;
-  animation: pulse 3s ease-in-out infinite;
-}
-.brand-logo svg { width: 20px; height: 20px; }
-.topbar nav { display: flex; gap: 0.5rem; }
-.topbar nav button {
-  display: flex; align-items: center; gap: 0.4rem;
-  padding: 0.5rem 1rem;
-  border: 1px solid #e2e8f0;
-  background: #fff;
-  border-radius: 10px;
-  cursor: pointer;
-  font-size: 0.9rem;
-  transition: all 0.25s ease;
-}
-.topbar nav button:hover {
-  background: linear-gradient(135deg, var(--primary), var(--secondary));
-  color: #fff;
-  border-color: transparent;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(102,126,234,0.35);
-}
+.admin-settings-page { position: relative; }
 
 /* 主体 */
-.content { padding: 2rem; max-width: 1100px; margin: 0 auto; }
+.content { padding: 0; max-width: 1100px; margin: 0 auto; }
 .page-title { font-size: 1.5rem; color: #1a202c; }
 .page-sub { color: #718096; margin: 0.3rem 0 1.8rem; }
 
@@ -351,6 +313,45 @@ onMounted(() => {
 .users-table {
   overflow-x: auto;
 }
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.table th, .table td {
+  padding: 0.75rem 1rem;
+  text-align: left;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+.table th {
+  font-size: 0.85rem;
+  color: #718096;
+  font-weight: 600;
+}
+.table td { color: #4a5568; font-size: 0.92rem; }
+.table .username { font-weight: 600; color: #2d3748; }
+.role-badge {
+  display: inline-block;
+  padding: 0.15rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+.role-badge.admin { background: rgba(102,126,234,0.12); color: #5a67d8; }
+.role-badge.user { background: rgba(72,187,120,0.1); color: #38a169; }
+.role-btn {
+  padding: 0.35rem 0.8rem;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  white-space: nowrap;
+}
+.role-btn.promote { color: #5a67d8; }
+.role-btn.promote:hover { background: linear-gradient(135deg, var(--primary), var(--secondary)); color: #fff; border-color: transparent; }
+.role-btn.demote { color: #e53e3e; border-color: #fc8181; }
+.role-btn.demote:hover { background: #e53e3e; color: #fff; border-color: transparent; }
 .loading, .error, .empty-state {
   text-align: center;
   padding: 3rem;
@@ -369,19 +370,6 @@ onMounted(() => {
 .empty-state p { color: #718096; margin-bottom: 0.5rem; }
 .empty-state .hint { font-size: 0.9rem; color: #a0aec0; }
 
-@keyframes gradientShift {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-@keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-20px); }
-}
-@keyframes pulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-}
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }

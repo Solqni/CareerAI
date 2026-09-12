@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import BackButton from '@/components/BackButton.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
+const route = useRoute()
 const auth = useAuthStore()
 
 const user = ref({
@@ -53,6 +54,7 @@ function handleLogout() {
         </div>
       </div>
       <nav>
+        <button v-if="route.name !== 'admin'" @click="router.push('/admin')">控制台</button>
         <button @click="router.push('/admin/jobs')">岗位管理</button>
         <button @click="router.push('/admin/rag')">RAG 知识库</button>
         <button @click="router.push('/admin/settings')">系统设置</button>
@@ -61,6 +63,8 @@ function handleLogout() {
     </header>
 
     <main class="content">
+      <!-- 控制台首页内容（仅 /admin 显示，子页面走 router-view） -->
+      <template v-if="route.name === 'admin'">
       <h2 class="page-title anim-fade-up">管理员控制台</h2>
       <p class="page-sub anim-fade-up anim-delay-1">管理岗位文档和 RAG 知识库</p>
 
@@ -114,6 +118,10 @@ function handleLogout() {
           </button>
         </div>
       </div>
+      </template>
+
+      <!-- 子页面挂载点：/admin/jobs、/admin/rag、/admin/settings -->
+      <router-view />
     </main>
   </div>
 </template>

@@ -6,7 +6,7 @@
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user, get_db
+from app.api.deps import get_current_user, get_current_admin, get_db
 from app.core.response import fail, ok
 from app.models import User
 from app.schemas.knowledge import (
@@ -24,10 +24,10 @@ router = APIRouter(prefix="/knowledge", tags=["knowledge"])
 async def upload_document(
     file: UploadFile = File(...),
     title: str | None = Form(default=None),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """上传 PDF/Word/Markdown/TXT 文档，自动切分、向量化并入库。"""
+    """上传 PDF/Word/Markdown/TXT 文档，自动切分、向量化并入库（管理员专属）。"""
     if not file.filename:
         raise HTTPException(status_code=400, detail="文件名不能为空")
 
@@ -69,10 +69,10 @@ async def get_document(
 @router.delete("/{doc_id}")
 async def delete_document(
     doc_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """删除文档及其向量切片。"""
+    """删除文档及其向量切片（管理员专属）。"""
     deleted = await rag.delete_document(db, doc_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="文档不存在")
