@@ -119,6 +119,7 @@ async def list_jobs(
     return [
         JobListItem(
             id=job.id,
+            position_title=(job.parsed_json or {}).get("position_title") or None,
             parsed_json=job.parsed_json,
             created_at=job.created_at,
             requirement_count=len(job.requirements),

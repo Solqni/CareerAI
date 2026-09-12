@@ -4,10 +4,13 @@ import {
   getMatches,
   analyzeMatch,
   getMatchDetail,
+  getMatchPlan,
+  updateTaskStatus,
   type MatchAnalysisRequest,
   type MatchAnalysisResult,
   type MatchListItem,
-  type MatchFeedback
+  type LearningPlan,
+  type LearningTask
 } from '@/api/match'
 
 export const useMatchStore = defineStore('match', () => {
@@ -15,8 +18,8 @@ export const useMatchStore = defineStore('match', () => {
   const matches = ref<MatchListItem[]>([])
   // 当前分析的匹配详情
   const currentMatch = ref<MatchAnalysisResult | null>(null)
-  // 匹配反馈和学习计划
-  const matchFeedback = ref<MatchFeedback | null>(null)
+  // 当前学习计划（含任务）
+  const currentPlan = ref<LearningPlan | null>(null)
 
   const loading = ref(false)
   const error = ref('')
@@ -84,20 +87,37 @@ export const useMatchStore = defineStore('match', () => {
     }
   }
 
-  // 生成匹配反馈和学习计划
-  async function generateFeedback(matchId: string) {
+  // 加载匹配报告对应的学习计划
+  async function loadPlan(matchId: string) {
     try {
       loading.value = true
       error.value = ''
-      const feedback = await fetch(`/match/${matchId}/feedback`).then(res => res.json())
-      matchFeedback.value = feedback
-      return feedback
+      const plan = await getMatchPlan(matchId)
+      currentPlan.value = plan
+      return plan
     } catch (err: any) {
-      error.value = err.response?.data?.detail || '生成反馈失败'
-      console.error('生成反馈失败:', err)
+      error.value = err.response?.data?.detail || '获取学习计划失败'
+      console.error('获取学习计划失败:', err)
       throw err
     } finally {
       loading.value = false
+    }
+  }
+
+  // 更新学习任务状态
+  async function setTaskStatus(taskId: number, status: LearningTask['status']) {
+    try {
+      const task = await updateTaskStatus(taskId, status)
+      // 同步本地计划中的任务状态
+      if (currentPlan.value) {
+        const local = currentPlan.value.tasks.find(t => t.id === taskId)
+        if (local) local.status = task.status
+      }
+      return task
+    } catch (err: any) {
+      error.value = err.response?.data?.detail || '更新任务状态失败'
+      console.error('更新任务状态失败:', err)
+      throw err
     }
   }
 
@@ -185,7 +205,7 @@ export const useMatchStore = defineStore('match', () => {
     // 状态
     matches,
     currentMatch,
-    matchFeedback,
+    currentPlan,
     loading,
     error,
 
@@ -208,7 +228,8 @@ export const useMatchStore = defineStore('match', () => {
     fetchMatches,
     analyzeMatchData,
     loadMatchDetail,
-    generateFeedback,
+    loadPlan,
+    setTaskStatus,
     getMatchLevel,
     getGapSeverity,
     getRecommendationPriority

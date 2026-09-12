@@ -1,4 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
+import logging
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -16,10 +18,12 @@ from app.services.match_analysis import calculate_match_report
 from app.services.matching import (
     generate_and_persist_plan,
     get_plan_by_report,
+    llm_match_analysis,
     update_task_status,
 )
 
 router = APIRouter(prefix="/match", tags=["match"])
+logger = logging.getLogger(__name__)
 
 # 报告完整预加载：差距 + 建议 + 学习计划（含任务），避免 commit 后懒加载 MissingGreenlet
 _REPORT_LOAD = (
@@ -57,6 +61,18 @@ async def _run_full_match(
 
     # 1-3. 匹配计算 + 报告/差距/建议 ORM 构造
     report = await calculate_match_report(resume, job, db)
+
+    # 需求 3.3.2：LLM 基于规则计算结果生成综合文字分析（失败降级保留规则 summary）
+    rule_summary = report.summary
+    try:
+        analysis = await llm_match_analysis(report)
+        if analysis:
+            report.summary = analysis
+            report.detail_json = {"analysis_source": "llm", "rule_summary": rule_summary}
+    except Exception:
+        logger.exception("LLM 综合分析生成失败，降级为规则 summary")
+        report.detail_json = {"analysis_source": "rule"}
+
     db.add(report)
     await db.flush()  # 先取 report.id，供 learning_plan 关联
 

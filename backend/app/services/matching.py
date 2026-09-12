@@ -102,6 +102,40 @@ async def _llm_plan_tasks(gaps: list[dict], position_title: str) -> list[dict]:
     return _normalize_tasks(_extract_json(content))
 
 
+async def llm_match_analysis(report: MatchReport) -> str | None:
+    """LLM 基于规则引擎的匹配数据生成综合文字分析（需求 3.3.2）。
+
+    评分保持规则计算（可解释、确定性强），LLM 只负责综合研判：
+    整体判断 → 核心优势 → 最需补齐短板 → 投递建议。
+    失败返回 None，由调用方降级为规则 summary。
+    """
+    from langchain_core.messages import HumanMessage, SystemMessage
+
+    data = {
+        "position_title": report.position_title,
+        "overall_score": report.overall_score,
+        "skill_match": report.skill_match,
+        "experience_match": report.experience_match,
+        "education_match": report.education_match,
+        "gaps": report.gaps_json or [],
+    }
+    llm = get_chat_llm()
+    resp = await llm.ainvoke(
+        [
+            SystemMessage(
+                "你是资深职业规划顾问。基于给定的人岗匹配数据（分维度得分与差距明细），"
+                "输出 3-5 句简明的综合分析（中文）：先给整体匹配判断，"
+                "再指出核心优势与最需补齐的短板，最后给出是否建议投递及理由。"
+                "直接输出文字，不要 JSON、不要标题符号。"
+            ),
+            HumanMessage(json.dumps(data, ensure_ascii=False)),
+        ]
+    )
+    content = resp.content if isinstance(resp.content, str) else str(resp.content)
+    content = content.strip()
+    return content or None
+
+
 async def generate_and_persist_plan(
     report: MatchReport, db: AsyncSession
 ) -> LearningPlan | None:

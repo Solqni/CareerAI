@@ -46,6 +46,23 @@ export async function getProfile(): Promise<Profile> {
   }
 }
 
+/** 获取最新简历（用于匹配/优化等场景的简历选择） */
+export function getLatestResume() {
+  return api.get('/resume/latest').then(r => r.data)
+}
+
+/** 简历列表项 */
+export interface ResumeListItem {
+  id: number
+  name?: string | null
+  created_at: string
+}
+
+/** 获取当前用户的简历列表（用于匹配/优化场景的简历选择下拉） */
+export function getResumes(): Promise<ResumeListItem[]> {
+  return api.get('/resume/list').then(r => r.data)
+}
+
 /** 粘贴文本解析简历 */
 export function parseResumeText(raw_text: string) {
   return api.post('/resume/parse', { raw_text }, { timeout: 120000 })

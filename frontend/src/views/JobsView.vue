@@ -256,7 +256,7 @@ async function handleSave() {
             <strong>下一步：能力匹配</strong>
             <p>对比简历技能与岗位要求，生成差距报告</p>
           </div>
-          <button class="btn btn-outline" @click="router.push('/match')">
+          <button class="btn btn-outline" @click="router.push({ path: '/match/new', query: jobStore.currentJob?.id ? { jobId: String(jobStore.currentJob.id) } : {} })">
             前往能力匹配
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
           </button>

@@ -1,4 +1,4 @@
-﻿import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory } from 'vue-router'
 
 import { checkAuth, checkRole } from './guards'
 
@@ -43,10 +43,11 @@ const router = createRouter({
     },
     { path: '/resume', name: 'resume', component: () => import('@/views/ResumeView.vue') },
     { path: '/jobs', name: 'jobs', component: () => import('@/views/JobsView.vue') },
+    // 能力匹配：/match 历史列表，/match/new 新建分析，/match/detail 报告详情
     { path: '/match', name: 'match-list', component: () => import('@/views/MatchListView.vue') },
     {
-      path: '/match',
-      name: 'match',
+      path: '/match/new',
+      name: 'match-new',
       component: () => import('@/views/MatchView.vue'),
       props: route => ({
         resumeId: route.query.resumeId ? Number(route.query.resumeId) : null,
@@ -54,20 +55,18 @@ const router = createRouter({
       })
     },
     {
-      path: '/match/result/:resumeId/:jobId',
-      name: 'match-result',
-      component: () => import('@/views/MatchView.vue'),
-      props: route => ({
-        resumeId: Number(route.params.resumeId),
-        jobId: Number(route.params.jobId)
-      })
-    },
-    {
       path: '/match/detail/:matchId',
       name: 'match-detail',
-      component: () => import('@/views/MatchView.vue'),
+      component: () => import('@/views/MatchDetailView.vue'),
       props: route => ({ matchId: route.params.matchId })
     },
+    {
+      path: '/match/plan/:matchId',
+      name: 'match-plan',
+      component: () => import('@/views/PlanView.vue'),
+      props: route => ({ matchId: route.params.matchId })
+    },
+    { path: '/optimize', name: 'optimize', component: () => import('@/views/OptimizeView.vue') },
     { path: '/interview', name: 'interview', component: () => import('@/views/InterviewView.vue') },
   ],
 })

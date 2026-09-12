@@ -6,6 +6,7 @@ from app.api.deps import get_current_user, get_db
 from app.models import Resume, User, UserExperience, UserSkill
 from app.schemas.resume import (
     ProfileOut,
+    ResumeListItem,
     ResumeOut,
     ResumeParseRequest,
     ResumeParsedResult,
@@ -102,6 +103,27 @@ async def _do_parse_resume(
     await db.commit()
     await db.refresh(resume)
     return resume
+
+
+@router.get("/list", response_model=list[ResumeListItem])
+async def list_resumes(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """当前用户的简历列表（用于匹配/优化场景的简历选择下拉）。"""
+    result = await db.scalars(
+        select(Resume)
+        .where(Resume.user_id == current_user.id)
+        .order_by(Resume.id.desc())
+    )
+    return [
+        ResumeListItem(
+            id=r.id,
+            name=(r.parsed_json or {}).get("name") or None,
+            created_at=r.created_at,
+        )
+        for r in result.all()
+    ]
 
 
 @router.get("/latest", response_model=ResumeOut)

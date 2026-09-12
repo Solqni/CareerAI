@@ -1,11 +1,22 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { getProfile, parseResumeText, uploadResumeFile } from '@/api/resume'
+import { getProfile, getResumes, parseResumeText, uploadResumeFile, type ResumeListItem } from '@/api/resume'
 
 export const useResumeStore = defineStore('resume', () => {
   const profile = ref<any>(null)
+  const resumes = ref<ResumeListItem[]>([])
   const loading = ref(false)
   const error = ref('')
+
+  // 获取用户简历列表（匹配/优化场景的下拉数据源）
+  async function fetchResumes() {
+    try {
+      resumes.value = await getResumes()
+    } catch (err: any) {
+      console.error('获取简历列表失败:', err)
+      resumes.value = []
+    }
+  }
 
   // 获取用户能力画像
   async function fetchProfile() {
@@ -88,8 +99,10 @@ export const useResumeStore = defineStore('resume', () => {
 
   return {
     profile,
+    resumes,
     loading,
     error,
+    fetchResumes,
     fetchProfile,
     parseResume,
     uploadFile,

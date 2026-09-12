@@ -28,6 +28,7 @@ class JobListItem(ORMBase):
     """岗位知识库列表项（不含 JD 全文）。"""
 
     id: int
+    position_title: str | None = None
     parsed_json: dict | None = None
     created_at: datetime
     requirement_count: int = 0

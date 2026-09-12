@@ -3,25 +3,28 @@ import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import BackButton from '@/components/BackButton.vue'
 import { useResumeStore } from '@/stores/resume'
+import { useJobStore } from '@/stores/job'
 import { useMatchStore } from '@/stores/match'
 
 const router = useRouter()
 const resumeStore = useResumeStore()
+const jobStore = useJobStore()
 const matchStore = useMatchStore()
 
 const navs = [
   { label: '我的简历', path: '/resume', icon: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z' },
   { label: '岗位分析', path: '/jobs', icon: 'M21 13.255A23.9 23.9 0 0 1 12 15a23.9 23.9 0 0 1-9-1.745V16a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2.745z' },
   { label: '能力匹配', path: '/match', icon: 'M22 12h-4l-3 9L9 3l-3 9H2' },
+  { label: '简历优化', path: '/optimize', icon: 'M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z' },
   { label: '面试准备', path: '/interview', icon: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z' },
 ]
 
-// 统计数据（基于用户真实数据）
+// 统计数据（实时取自用户上传与分析数据）
 const stats = ref([
-  { label: '技能数量', target: 0, suffix: '项', current: 0, color: '#667eea', icon: 'M12 2 2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5' },
+  { label: '简历技能', target: 0, suffix: '项', current: 0, color: '#667eea', icon: 'M12 2 2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5' },
   { label: '平均匹配度', target: 0, suffix: '%', current: 0, color: '#f093fb', icon: 'M22 12h-4l-3 9L9 3l-3 9H2' },
-  { label: '学习任务', target: 0, suffix: '个', current: 0, color: '#4facfe', icon: 'M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11' },
-  { label: '模拟面试', target: 0, suffix: '场', current: 0, color: '#43e97b', icon: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87' },
+  { label: '岗位分析', target: 0, suffix: '个', current: 0, color: '#4facfe', icon: 'M21 13.255A23.9 23.9 0 0 1 12 15a23.9 23.9 0 0 1-9-1.745V16a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-2.745z' },
+  { label: '匹配分析', target: 0, suffix: '次', current: 0, color: '#43e97b', icon: 'M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11' },
 ])
 
 const progress = ref(0)
@@ -39,14 +42,17 @@ function animateNumbers() {
     requestAnimationFrame(step)
   })
   // 进度条动画
-  setTimeout(() => { progress.value = 64 }, 300)
+  setTimeout(() => { progress.value = Math.min(stats.value[1].target, 100) }, 300)
 }
 
 onMounted(async () => {
   try {
-    // 获取用户简历数据
-    await resumeStore.fetchProfile()
-    await matchStore.fetchMatches()
+    // 并行获取用户实时数据：能力画像 + 岗位分析 + 匹配报告
+    await Promise.all([
+      resumeStore.fetchProfile(),
+      jobStore.fetchJobs(),
+      matchStore.fetchMatches()
+    ])
 
     // 更新统计数据
     updateStats()
@@ -68,27 +74,29 @@ onMounted(async () => {
 function updateStats() {
   const profile = resumeStore.profile
   const matches = matchStore.matches
+  const jobs = jobStore.jobs
 
-  // 更新技能数量
+  // 简历技能数
   const skillCount = profile?.skills?.length || 0
   stats.value[0].target = skillCount
 
-  // 更新匹配度
+  // 平均匹配度（overall_score）
+  let avgMatch = 0
   if (matches && matches.length > 0) {
-    const avgMatch = matches.reduce((sum: number, m: any) => sum + (m.score || 0), 0) / matches.length
-    stats.value[1].target = Math.round(avgMatch)
-  } else {
-    stats.value[1].target = 0
+    avgMatch = Math.round(
+      matches.reduce((sum: number, m: any) => sum + (m.overall_score || 0), 0) / matches.length
+    )
   }
+  stats.value[1].target = avgMatch
 
-  // 更新学习任务（暂时用固定值）
-  stats.value[2].target = 8
+  // 岗位分析数
+  stats.value[2].target = jobs?.length || 0
 
-  // 更新模拟面试（暂时用固定值）
-  stats.value[3].target = 3
+  // 匹配分析次数
+  stats.value[3].target = matches?.length || 0
 
-  // 更新进度条
-  progress.value = Math.min(stats.value[1].target, 100)
+  // 更新进度条（以平均匹配度为进度）
+  progress.value = Math.min(avgMatch, 100)
 }
 </script>
 

@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, Field, field_validator
 
 from app.schemas.common import ORMBase
@@ -5,6 +7,14 @@ from app.schemas.common import ORMBase
 
 class ResumeParseRequest(BaseModel):
     raw_text: str
+
+
+class ResumeListItem(ORMBase):
+    """简历列表项（用于匹配/优化场景的简历选择下拉）。"""
+
+    id: int
+    name: str | None = None
+    created_at: datetime
 
 
 class ResumeOut(ORMBase):

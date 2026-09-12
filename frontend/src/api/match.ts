@@ -39,6 +39,7 @@ export interface MatchAnalysisResult {
   experience_match: number
   education_match: number
   overall_score: number
+  summary?: string
   gaps: GapItem[]
   recommendations: Recommendation[]
   created_at: string
@@ -58,17 +59,27 @@ export interface MatchListItem {
   analyzed_at: string
 }
 
-// 匹配分析反馈
-export interface MatchFeedback {
-  feedback: string
-  learning_plan: Array<{
-    id: string
-    title: string
-    type: string
-    priority: string
-    estimated_time: string
-    completed: boolean
-  }>
+// 学习任务接口
+export interface LearningTask {
+  id: number
+  plan_id: number
+  task_name: string
+  description?: string
+  resource_url?: string
+  priority: 'low' | 'medium' | 'high'
+  estimated_days?: number
+  status: 'todo' | 'in_progress' | 'done'
+  due_date?: string
+}
+
+// 学习计划接口
+export interface LearningPlan {
+  id: number
+  user_id: number
+  report_id: string
+  content_json?: { tasks?: Array<Record<string, unknown>>; source?: string }
+  status: string
+  tasks: LearningTask[]
 }
 
 // 分析匹配度
@@ -91,14 +102,14 @@ export function getMatchDetail(matchId: string): Promise<MatchAnalysisResult> {
   return api.get<MatchAnalysisResult>(`/match/${matchId}`).then(r => r.data)
 }
 
-// 生成匹配反馈和学习计划
-export function generateMatchFeedback(matchId: string): Promise<MatchFeedback> {
-  return fetch(`/match/${matchId}/feedback`)
-    .then(response => response.json())
-    .catch(error => {
-      console.error('生成反馈失败:', error)
-      throw error
-    })
+// 获取匹配报告对应的学习计划（含任务列表）
+export function getMatchPlan(matchId: string): Promise<LearningPlan> {
+  return api.get<LearningPlan>(`/match/${matchId}/plan`).then(r => r.data)
+}
+
+// 更新学习任务状态（todo: 待开始 / in_progress: 进行中 / done: 已完成）
+export function updateTaskStatus(taskId: number, status: LearningTask['status']): Promise<LearningTask> {
+  return api.patch<LearningTask>(`/match/plan/tasks/${taskId}`, { status }).then(r => r.data)
 }
 
 // 创建匹配（保留旧接口）

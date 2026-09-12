@@ -17,7 +17,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.llm.client import get_chat_llm
-from app.models import JobAnalysis, Resume
+from app.models import JobAnalysis, MatchReport, Resume
 from app.schemas.optimize import OptimizationSuggestion
 from app.tools.job_analyzer import analyze_job_impl
 
@@ -92,7 +92,22 @@ async def generate_optimization(
 
     job_data = await analyze_job_impl(db, job_id)
 
-    # 3. LLM 生成结构化优化建议
+    # 3. 取最近一次人岗匹配的能力差距清单，作为优化上下文（需求 3.4：结合能力差距分析）
+    report = await db.scalar(
+        select(MatchReport)
+        .where(MatchReport.user_id == user_id)
+        .where(MatchReport.job_id == job_id)
+        .order_by(MatchReport.analyzed_at.desc())
+        .limit(1)
+    )
+    if report and report.gaps_json:
+        gap_text = json.dumps(report.gaps_json, ensure_ascii=False)
+        report_id = report.id
+    else:
+        gap_text = "（该岗位尚无匹配报告，请基于简历与岗位要求直接识别能力差距）"
+        report_id = None
+
+    # 4. LLM 生成结构化优化建议
     llm = get_chat_llm()
     resume_text = (resume.raw_text or "")[:_MAX_RESUME_CHARS]
     resp = await llm.ainvoke(
@@ -101,14 +116,15 @@ async def generate_optimization(
             HumanMessage(
                 f"【用户简历】\n{resume_text or '（简历文本缺失，仅有结构化解析结果）'}\n\n"
                 f"【目标岗位】{job_data.get('position_title') or '未命名岗位'}\n"
-                f"【岗位要求】\n{json.dumps(job_data, ensure_ascii=False, default=str)}"
+                f"【岗位要求】\n{json.dumps(job_data, ensure_ascii=False, default=str)}\n\n"
+                f"【能力差距分析（最近匹配报告 {report_id or '：无'}）】\n{gap_text}"
             ),
         ]
     )
     content = resp.content if isinstance(resp.content, str) else str(resp.content)
     raw = _extract_json(content)
 
-    # 4. Pydantic 校验（需求 8.3 结构化输出），非法条目丢弃
+    # 5. Pydantic 校验（需求 8.3 结构化输出），非法条目丢弃
     suggestions: list[dict] = []
     for item in raw.get("suggestions", []):
         try:

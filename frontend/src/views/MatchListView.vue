@@ -33,7 +33,7 @@ function viewMatchDetail(matchId: string) {
 
 // 分析新的匹配
 function analyzeNewMatch() {
-  router.push('/match')
+  router.push('/match/new')
 }
 
 // 初始化
