@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { collectKnowledge, type CollectKnowledgeResult } from '@/api/admin'
 import { deleteDocument, listDocuments, uploadDocument, type KnowledgeDoc } from '@/api/knowledge'
 
 const collections = ref<KnowledgeDoc[]>([])
@@ -7,6 +8,33 @@ const loading = ref(true)
 const error = ref('')
 const uploading = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
+
+// ===== AI 知识采集 =====
+const aiTopic = ref('')
+const aiDocCount = ref(1)
+const aiCollecting = ref(false)
+const aiResult = ref<CollectKnowledgeResult | null>(null)
+const aiError = ref('')
+
+const handleAiCollect = async () => {
+  const topic = aiTopic.value.trim()
+  if (!topic) {
+    aiError.value = '请输入知识主题，如：Python 后端面试高频考点'
+    return
+  }
+  try {
+    aiCollecting.value = true
+    aiError.value = ''
+    aiResult.value = null
+    aiResult.value = await collectKnowledge({ topic, doc_count: aiDocCount.value })
+    await fetchCollections()
+  } catch (err: any) {
+    aiError.value = err.response?.data?.message || err.response?.data?.detail || 'AI 知识采集失败'
+    console.error('AI 知识采集失败:', err)
+  } finally {
+    aiCollecting.value = false
+  }
+}
 
 // 文档切片总数（概览卡片用）
 const totalChunks = computed(() =>
@@ -120,6 +148,41 @@ onMounted(() => {
             <h3>文档切片总数</h3>
             <p class="number">{{ totalChunks }}</p>
           </div>
+        </div>
+      </div>
+
+      <!-- AI 知识采集 -->
+      <div class="ai-collect-card anim-fade-up anim-delay-2">
+        <div class="collect-head">
+          <h3>AI 采集知识文档</h3>
+          <span class="collect-tag">自动生成 → 切分 → 向量化入库</span>
+        </div>
+        <p>输入知识主题，AI 生成结构化知识文档并自动构建 RAG 索引，标题带【AI采集】前缀</p>
+        <div class="collect-form">
+          <input
+            v-model="aiTopic"
+            class="collect-input"
+            placeholder="知识主题，如：Python 后端面试高频考点 / 前端学习路线"
+            :disabled="aiCollecting"
+            @keyup.enter="handleAiCollect"
+          />
+          <select v-model.number="aiDocCount" class="collect-select" :disabled="aiCollecting">
+            <option :value="1">1 篇</option>
+            <option :value="2">2 篇</option>
+            <option :value="3">3 篇</option>
+          </select>
+          <button class="collect-btn" :disabled="aiCollecting" @click="handleAiCollect">
+            {{ aiCollecting ? 'AI 正在撰写并入库…（约 30-60 秒）' : '开始 AI 采集' }}
+          </button>
+        </div>
+        <p v-if="aiError" class="collect-error">{{ aiError }}</p>
+        <div v-if="aiResult" class="collect-result">
+          <p class="result-title">已生成 {{ aiResult.generated_count }} 篇文档并入库：</p>
+          <ul>
+            <li v-for="d in aiResult.documents" :key="d.id">
+              {{ d.title }} · {{ d.chunk_count }} 个切片
+            </li>
+          </ul>
         </div>
       </div>
 
@@ -242,6 +305,72 @@ onMounted(() => {
   font-size: 0.85rem;
   font-weight: 500;
 }
+
+/* AI 采集卡片 */
+.ai-collect-card {
+  background: linear-gradient(135deg, rgba(102,126,234,0.08), rgba(118,75,162,0.08));
+  border: 1px solid rgba(102,126,234,0.25);
+  border-radius: 16px;
+  padding: 1.5rem 1.8rem;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.04);
+  margin-bottom: 2rem;
+}
+.collect-head { display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.4rem; flex-wrap: wrap; }
+.ai-collect-card h3 { font-size: 1.15rem; color: #2d3748; }
+.collect-tag {
+  font-size: 0.72rem;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  background: rgba(102,126,234,0.12);
+  color: #5a67d8;
+  font-weight: 500;
+}
+.ai-collect-card > p { color: #718096; margin-bottom: 1.1rem; font-size: 0.88rem; }
+.collect-form { display: flex; gap: 0.7rem; flex-wrap: wrap; }
+.collect-input {
+  flex: 1;
+  min-width: 220px;
+  padding: 0.65rem 0.9rem;
+  border: 1px solid #cbd5e0;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  outline: none;
+  background: #fff;
+}
+.collect-input:focus { border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.15); }
+.collect-select {
+  padding: 0.65rem 0.7rem;
+  border: 1px solid #cbd5e0;
+  border-radius: 10px;
+  background: #fff;
+  font-size: 0.9rem;
+  outline: none;
+}
+.collect-btn {
+  padding: 0.65rem 1.6rem;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  white-space: nowrap;
+}
+.collect-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(102,126,234,0.3); }
+.collect-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.collect-error { color: #e53e3e; font-size: 0.85rem; margin-top: 0.7rem; }
+.collect-result {
+  margin-top: 1rem;
+  background: rgba(72,187,120,0.08);
+  border: 1px solid rgba(72,187,120,0.25);
+  border-radius: 12px;
+  padding: 0.9rem 1.1rem;
+}
+.result-title { font-size: 0.9rem; font-weight: 600; color: #22543d; margin-bottom: 0.5rem; }
+.collect-result ul { list-style: none; }
+.collect-result li { font-size: 0.85rem; color: #4a5568; padding: 0.15rem 0; }
 
 /* 知识库列表 */
 .collections-section .section-header {

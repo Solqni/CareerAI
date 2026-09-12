@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { getSystemInfo, listUsers, updateUserRole, type AdminUser, type SystemInfo } from '@/api/admin'
+import { getSystemInfo, listUsers, updateUser, updateUserRole, deleteUser, type AdminUser, type SystemInfo } from '@/api/admin'
+import { useAuthStore } from '@/stores/auth'
+
+const authStore = useAuthStore()
 
 const settings = ref({
   database: {
@@ -66,6 +69,70 @@ const handleSetRole = async (user: AdminUser, role: 'user' | 'admin') => {
 // 显示提示（模板中无法直接访问 window.alert）
 const showAlert = (message: string) => {
   alert(message)
+}
+
+// ===== 用户信息编辑 =====
+const showEditModal = ref(false)
+const editingUser = ref<AdminUser | null>(null)
+const editForm = ref({ username: '', email: '', password: '' })
+const editSaving = ref(false)
+const editError = ref('')
+
+const openEditModal = (user: AdminUser) => {
+  editingUser.value = user
+  editForm.value = { username: user.username, email: user.email || '', password: '' }
+  editError.value = ''
+  showEditModal.value = true
+}
+
+const closeEditModal = () => {
+  showEditModal.value = false
+  editingUser.value = null
+}
+
+const handleSaveEdit = async () => {
+  if (!editingUser.value) return
+  const username = editForm.value.username.trim()
+  if (!username) {
+    editError.value = '用户名不能为空'
+    return
+  }
+  const payload: { username?: string; email?: string | null; password?: string } = {
+    username,
+    email: editForm.value.email.trim() || null
+  }
+  if (editForm.value.password) payload.password = editForm.value.password
+
+  editSaving.value = true
+  try {
+    await updateUser(editingUser.value.id, payload)
+    showAlert(`已更新用户「${editingUser.value.username}」的信息`)
+    closeEditModal()
+    await fetchUsers()
+  } catch (err: any) {
+    editError.value = err.response?.data?.message || err.response?.data?.detail || '更新失败'
+  } finally {
+    editSaving.value = false
+  }
+}
+
+// ===== 用户删除 =====
+const deleting = ref<number | null>(null)
+
+const handleDelete = async (user: AdminUser) => {
+  if (!confirm(`确定删除用户「${user.username}」吗？\n该用户的全部分析、报告、学习计划、面试与对话数据将被一并删除，操作不可恢复！`)) {
+    return
+  }
+  deleting.value = user.id
+  try {
+    await deleteUser(user.id)
+    showAlert(`已删除用户「${user.username}」及其全部业务数据`)
+    await fetchUsers()
+  } catch (err: any) {
+    error.value = err.response?.data?.message || err.response?.data?.detail || '删除失败'
+  } finally {
+    deleting.value = null
+  }
 }
 
 onMounted(async () => {
@@ -211,20 +278,31 @@ onMounted(async () => {
                   </span>
                 </td>
                 <td>
-                  <button
-                    v-if="user.role === 'user'"
-                    class="role-btn promote"
-                    @click="handleSetRole(user, 'admin')"
-                  >
-                    设为管理员
-                  </button>
-                  <button
-                    v-else
-                    class="role-btn demote"
-                    @click="handleSetRole(user, 'user')"
-                  >
-                    设为普通用户
-                  </button>
+                  <div class="action-group">
+                    <button
+                      v-if="user.role === 'user'"
+                      class="role-btn promote"
+                      @click="handleSetRole(user, 'admin')"
+                    >
+                      设为管理员
+                    </button>
+                    <button
+                      v-else
+                      class="role-btn demote"
+                      @click="handleSetRole(user, 'user')"
+                    >
+                      设为普通用户
+                    </button>
+                    <button class="role-btn edit" @click="openEditModal(user)">编辑</button>
+                    <button
+                      v-if="user.id !== authStore.user?.id"
+                      class="role-btn delete"
+                      :disabled="deleting === user.id"
+                      @click="handleDelete(user)"
+                    >
+                      {{ deleting === user.id ? '删除中...' : '删除' }}
+                    </button>
+                  </div>
                 </td>
               </tr>
             </tbody>
@@ -232,6 +310,42 @@ onMounted(async () => {
         </div>
       </div>
     </main>
+
+    <!-- 用户信息编辑弹窗 -->
+    <div v-if="showEditModal" class="modal-mask" @click.self="closeEditModal">
+      <div class="modal-card">
+        <div class="modal-head">
+          <h3>编辑用户{{ editingUser ? ` #${editingUser.id}` : '' }}</h3>
+          <button class="modal-close" @click="closeEditModal">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-item">
+            <label>用户名</label>
+            <input v-model="editForm.username" placeholder="用户名" />
+          </div>
+          <div class="form-item">
+            <label>邮箱</label>
+            <input v-model="editForm.email" placeholder="邮箱（可留空）" />
+          </div>
+          <div class="form-item">
+            <label>新密码</label>
+            <input
+              v-model="editForm.password"
+              type="password"
+              placeholder="留空则不修改密码"
+              autocomplete="new-password"
+            />
+          </div>
+          <p v-if="editError" class="form-error">{{ editError }}</p>
+        </div>
+        <div class="modal-foot">
+          <button class="modal-btn ghost" @click="closeEditModal">取消</button>
+          <button class="modal-btn primary" :disabled="editSaving" @click="handleSaveEdit">
+            {{ editSaving ? '保存中...' : '保存' }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -352,6 +466,89 @@ onMounted(async () => {
 .role-btn.promote:hover { background: linear-gradient(135deg, var(--primary), var(--secondary)); color: #fff; border-color: transparent; }
 .role-btn.demote { color: #e53e3e; border-color: #fc8181; }
 .role-btn.demote:hover { background: #e53e3e; color: #fff; border-color: transparent; }
+.role-btn.edit { color: #3182ce; border-color: #90cdf4; }
+.role-btn.edit:hover { background: #3182ce; color: #fff; border-color: transparent; }
+.role-btn.delete { color: #c53030; border-color: #feb2b2; }
+.role-btn.delete:hover { background: #c53030; color: #fff; border-color: transparent; }
+.role-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.action-group { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+
+/* 编辑弹窗 */
+.modal-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.modal-card {
+  width: min(420px, calc(100vw - 2rem));
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.18);
+  overflow: hidden;
+  animation: modal-in 0.2s ease;
+}
+@keyframes modal-in {
+  from { transform: translateY(12px) scale(0.98); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
+.modal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+.modal-head h3 { font-size: 1.05rem; color: #2d3748; }
+.modal-close {
+  border: none;
+  background: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: #a0aec0;
+  cursor: pointer;
+}
+.modal-close:hover { color: #4a5568; }
+.modal-body { padding: 1.25rem; display: flex; flex-direction: column; gap: 0.9rem; }
+.form-item { display: flex; flex-direction: column; gap: 0.35rem; }
+.form-item label { font-size: 0.85rem; font-weight: 500; color: #4a5568; }
+.form-item input {
+  padding: 0.55rem 0.8rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.92rem;
+  color: #2d3748;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+.form-item input:focus { border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.12); }
+.form-error { color: #e53e3e; font-size: 0.85rem; margin: 0; }
+.modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  padding: 1rem 1.25rem;
+  border-top: 1px solid rgba(0,0,0,0.06);
+}
+.modal-btn {
+  padding: 0.5rem 1.1rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.modal-btn.ghost { background: #fff; border: 1px solid #e2e8f0; color: #4a5568; }
+.modal-btn.ghost:hover { background: #f7fafc; }
+.modal-btn.primary {
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  border: none;
+  color: #fff;
+}
+.modal-btn.primary:disabled { opacity: 0.6; cursor: not-allowed; }
 .loading, .error, .empty-state {
   text-align: center;
   padding: 3rem;
