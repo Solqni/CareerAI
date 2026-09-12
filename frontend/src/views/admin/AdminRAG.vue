@@ -41,6 +41,13 @@ const totalChunks = computed(() =>
   collections.value.reduce((sum, doc) => sum + (doc.chunk_count || 0), 0)
 )
 
+// 平均每个文档的切片数（无文档时显示 —）
+const avgChunks = computed(() =>
+  collections.value.length
+    ? (totalChunks.value / collections.value.length).toFixed(1)
+    : '—'
+)
+
 // 获取知识库文档列表
 const fetchCollections = async () => {
   try {
@@ -133,8 +140,8 @@ onMounted(() => {
             </svg>
           </div>
           <div class="card-content">
-            <h3>处理状态</h3>
-            <p class="status">运行中</p>
+            <h3>平均切片数/文档</h3>
+            <p class="number">{{ avgChunks }}</p>
           </div>
         </div>
 
@@ -297,15 +304,6 @@ onMounted(() => {
   font-size: 1.8rem;
   font-weight: 700;
   color: #2d3748;
-}
-.card-content .status {
-  display: inline-block;
-  padding: 0.2rem 0.8rem;
-  background: rgba(72, 187, 120, 0.1);
-  color: #48bb78;
-  border-radius: 999px;
-  font-size: 0.85rem;
-  font-weight: 500;
 }
 
 /* AI 采集卡片 */
