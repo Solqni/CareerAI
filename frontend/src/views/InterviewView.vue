@@ -212,12 +212,12 @@ function backToSetup() {
         <h2>面试准备</h2>
         <p>AI 扮演面试官进行多轮对话，每轮从逻辑性、完整性、专业性评估，结束生成总评报告</p>
       </div>
-      <button class="btn-ghost header-dashboard" @click="router.push('/')">
+      <button class="btn-ghost header-dashboard" @click="router.push('/dashboard')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
           <polyline points="9 22 9 12 15 12 15 22" />
         </svg>
-        返回仪表盘
+        返回工作台
       </button>
     </div>
 

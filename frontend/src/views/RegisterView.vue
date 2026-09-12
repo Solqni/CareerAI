@@ -23,8 +23,8 @@ async function handleRegister() {
       email: email.value,
       role: role.value
     })
-    // 注册成功自动登录，直接跳转到首页
-    router.push('/')
+    // 注册成功后跳转登录页，由用户手动登录
+    router.push('/login')
   } catch (err: any) {
     error.value = err.response?.data?.detail || '注册失败，请检查信息'
   } finally {
