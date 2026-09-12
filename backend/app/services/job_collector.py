@@ -208,26 +208,30 @@ async def collect_jobs_from_web(
         items = await _llm_fallback_jobs(keyword, count)
 
     collected, skipped, failed = [], [], 0
-    seen: set[tuple[str, str]] = set()  # 批内（岗位名, 单位）去重
+    seen: dict[tuple[str, str], int] = {}  # 批内（岗位名, 单位）→ 已存在/已入库岗位 id
     for item in items:
         if len(collected) >= count:
             break
         title = str(item.get("jobName") or "").strip()
         company = str(item.get("recName") or "").strip()
         key = (title, company)
-        if not title or key in seen:
+        if not title:
+            continue
+        if key in seen:
+            # 批内重复：直接跳过，关联到首次出现时入库/命中的岗位
+            skipped.append({"existing_id": seen[key], "position_title": title, "company": company})
             continue
         try:
             existing_id = await _find_existing_shared_job(db, title, company)
             if existing_id is not None:
-                seen.add(key)
+                seen[key] = existing_id
                 skipped.append({"existing_id": existing_id, "position_title": title, "company": company})
                 continue
             job = await _parse_and_save(db, admin_user_id, _build_jd_text(item), item, source)
-            seen.add(key)
             if job is None:
                 failed += 1
                 continue
+            seen[key] = job.id
             collected.append(
                 {
                     "id": job.id,

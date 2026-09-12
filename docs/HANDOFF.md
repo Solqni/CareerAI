@@ -25,7 +25,7 @@
 
 - **需求只到 M5（五大模块），无 M6 规格**；M1~M5 全部开发完成，管理员优化为额外增强
 - **分支**：`feature-admin-optimize`（从 main 切出）；main 已含 M5 全部内容
-- 管理员优化关键文件：backend `app/services/job_collector.py`（ncss 爬取 + LLM 降级）、`app/services/knowledge_collector.py`、`app/services/admin_ops.py`（级联删除）、`app/api/v1/admin.py`（采集/用户管理/岗位管理接口）、`app/models/job.py`（新增 `is_shared` 共享岗位字段）、`test_admin_collect.py`（E2E）；frontend `api/admin.ts`、`AdminJobs.vue`/`AdminRAG.vue`（AI 采集 UI）、`AdminSettings.vue`（用户编辑弹窗 + 删除）
+- 管理员优化关键文件：backend `app/services/job_collector.py`（ncss 爬取 + LLM 降级 + 按岗位名/单位去重）、`app/services/knowledge_collector.py`、`app/services/admin_ops.py`（级联删除）、`app/api/v1/admin.py`（采集/用户管理/岗位管理接口）、`app/models/job.py`（新增 `is_shared` 共享岗位字段）、`test_job_collector_dedup.py`（去重单测 10 例，pytest -v 运行）、`test_admin_collect.py`（E2E）；frontend `api/admin.ts`、`AdminJobs.vue`/`AdminRAG.vue`（AI 采集 UI）、`AdminSettings.vue`（用户编辑弹窗 + 删除）
 - 岗位共享机制：管理员采集的岗位 `is_shared=True`，普通用户 GET /jobs 用 `or_(user_id==me, is_shared==True)` 可见；`job_analysis` 表是加列非新建，无历史表结构冲突
 - 关键新文件（M5）：backend `app/services/interview.py`、`app/tools/interview_helper.py`（generate_interview_q 工具）、`app/api/v1/interview.py`、`test_interview_api.py`；frontend `api/interview.ts`、`views/InterviewView.vue`（由演示动画改造为真实流程）
 - M3/4 关键文件：backend `app/services/matching.py`、`app/services/optimization.py`、`app/api/v1/optimize.py`、`app/api/v1/admin.py`；frontend `PlanView.vue`、`OptimizeView.vue`、`MatchDetailView.vue`、`api/knowledge.ts`、`api/admin.ts`
