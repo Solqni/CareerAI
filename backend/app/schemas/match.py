@@ -119,3 +119,29 @@ class TaskStatus(str, Enum):
 class TaskStatusUpdate(BaseModel):
     """学习任务状态更新请求"""
     status: TaskStatus = Field(..., description="任务状态：todo / in_progress / done")
+
+
+class StudyKnowledgeItem(BaseModel):
+    """学习内容关联的知识点（来自平台管理员知识库 RAG 检索）"""
+    content: str = Field(..., description="知识片段内容")
+    doc_title: str = Field(..., description="来源文档标题")
+    similarity: float = Field(..., description="与任务的相关度")
+
+
+class StudyQuestionItem(BaseModel):
+    """学习任务练习题（LLM 生成，含参考答案）"""
+    question: str = Field(..., description="练习题目")
+    reference_answer: str = Field("", description="参考答案")
+
+
+class TaskStudyOut(BaseModel):
+    """学习任务的学习内容"""
+    task_id: int
+    task_name: str
+    knowledge: List[StudyKnowledgeItem] = Field(
+        default_factory=list, description="关联知识点（管理员知识库检索）"
+    )
+    questions: List[StudyQuestionItem] = Field(
+        default_factory=list, description="练习题目（首次生成后缓存）"
+    )
+    source: str = Field("rag_only", description="题目来源：cache（缓存）/ llm（新生成）/ rag_only（仅知识点）")

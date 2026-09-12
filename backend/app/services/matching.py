@@ -217,3 +217,115 @@ async def update_task_status(
     await db.commit()
     await db.refresh(task)
     return task
+
+
+_STUDY_SYSTEM_PROMPT = (
+    "你是学习教练。根据学习任务与知识库片段为用户生成练习题，必须输出 JSON，"
+    '格式：{"questions": [{"question": "...", "reference_answer": "..."}]}。要求：\n'
+    "1. 题目 3-5 道，紧扣任务涉及的知识点（优先结合知识库片段内容）；\n"
+    "2. 题型为简答/场景分析，能检验掌握程度，不要选择题；\n"
+    "3. reference_answer 简明准确，每题 2-4 句；\n"
+    "4. 仅输出 JSON，不要多余文字。"
+)
+
+
+def _normalize_questions(raw: dict) -> list[dict]:
+    """校验并规整 LLM 返回的练习题列表。"""
+    questions = raw.get("questions") if isinstance(raw, dict) else None
+    if not isinstance(questions, list):
+        return []
+    result = []
+    for q in questions:
+        if not isinstance(q, dict) or not q.get("question"):
+            continue
+        result.append(
+            {
+                "question": str(q["question"]),
+                "reference_answer": str(q.get("reference_answer") or ""),
+            }
+        )
+    return result[:5]
+
+
+async def get_task_study(task_id: int, user_id: int, db: AsyncSession) -> dict | None:
+    """学习任务的学习内容：RAG 实时检索关联知识点（管理员知识库）+ 练习题。
+
+    练习题由 LLM 生成并缓存到 task.study_json，再次查看直接复用（source=cache）。
+    LLM 失败降级为仅返回知识点（source=rag_only）。任务不存在或不属于该用户返回 None。
+    """
+    import logging
+
+    from langchain_core.messages import HumanMessage, SystemMessage
+
+    from app.services.rag import search_knowledge
+
+    logger = logging.getLogger(__name__)
+
+    task = await db.scalar(
+        select(LearningTask)
+        .join(LearningPlan, LearningTask.plan_id == LearningPlan.id)
+        .where(LearningTask.id == task_id)
+        .where(LearningPlan.user_id == user_id)
+    )
+    if not task:
+        return None
+
+    # 1. 关联知识点：实时 RAG 检索（失败降级为空列表，不阻断）
+    knowledge: list[dict] = []
+    try:
+        query = " ".join([task.task_name, task.description or ""]).strip()
+        hits = await search_knowledge(db, query, top_k=4) if query else []
+        knowledge = [
+            {
+                "doc_title": h["doc_title"],
+                "content": h["content"],
+                "similarity": h["similarity"],
+            }
+            for h in hits
+        ]
+    except Exception:
+        logger.exception("学习内容知识库检索失败，返回空知识点")
+
+    # 2. 练习题：命中缓存直接复用；否则 LLM 生成并写回 study_json
+    questions: list[dict] = []
+    source = "rag_only"
+    cached = task.study_json if isinstance(task.study_json, dict) else None
+    if cached and cached.get("questions"):
+        questions = cached["questions"]
+        source = "cache"
+    else:
+        try:
+            context = "\n\n".join(
+                f"[片段{i + 1}]（来源：{k['doc_title']}）\n{k['content']}"
+                for i, k in enumerate(knowledge)
+            ) or "（无知识库片段，请基于通用知识出题）"
+            llm = get_chat_llm()
+            resp = await llm.ainvoke(
+                [
+                    SystemMessage(_STUDY_SYSTEM_PROMPT),
+                    HumanMessage(
+                        f"学习任务：{task.task_name}\n"
+                        f"任务描述：{task.description or '（无）'}\n\n"
+                        f"知识库片段：\n{context}"
+                    ),
+                ]
+            )
+            content = resp.content if isinstance(resp.content, str) else str(resp.content)
+            questions = _normalize_questions(_extract_json(content))
+            if questions:
+                source = "llm"
+        except Exception:
+            logger.exception("学习内容练习题生成失败，降级仅返回知识点")
+
+    # 3. 先组装返回值（避免 commit 后访问过期属性），再落缓存
+    result = {
+        "task_id": task.id,
+        "task_name": task.task_name,
+        "knowledge": knowledge,
+        "questions": questions,
+        "source": source,
+    }
+    if questions and source == "llm":
+        task.study_json = {"questions": questions, "source": "llm"}
+        await db.commit()
+    return result

@@ -13,11 +13,13 @@ from app.schemas.match import (
     MatchCreate,
     MatchOut,
     TaskStatusUpdate,
+    TaskStudyOut,
 )
 from app.services.match_analysis import calculate_match_report
 from app.services.matching import (
     generate_and_persist_plan,
     get_plan_by_report,
+    get_task_study,
     llm_match_analysis,
     update_task_status,
 )
@@ -191,3 +193,16 @@ async def update_learning_task(
     if not task:
         raise HTTPException(status_code=404, detail="学习任务不存在")
     return task
+
+
+@router.get("/plan/tasks/{task_id}/study", response_model=TaskStudyOut)
+async def get_learning_task_study(
+    task_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """任务学习资料：关联知识点（RAG 检索管理员知识库）+ 练习题（首次 LLM 生成后缓存）"""
+    study = await get_task_study(task_id, current_user.id, db)
+    if not study:
+        raise HTTPException(status_code=404, detail="学习任务不存在")
+    return study

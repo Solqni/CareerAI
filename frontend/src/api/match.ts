@@ -62,6 +62,26 @@ export interface MatchListItem {
   analyzed_at: string
 }
 
+// 学习任务学习内容（知识点来自管理员知识库检索，练习题首次生成后缓存）
+export interface StudyKnowledgeItem {
+  content: string
+  doc_title: string
+  similarity: number
+}
+
+export interface StudyQuestionItem {
+  question: string
+  reference_answer: string
+}
+
+export interface TaskStudy {
+  task_id: number
+  task_name: string
+  knowledge: StudyKnowledgeItem[]
+  questions: StudyQuestionItem[]
+  source: 'cache' | 'llm' | 'rag_only'
+}
+
 // 学习任务接口
 export interface LearningTask {
   id: number
@@ -113,6 +133,11 @@ export function getMatchPlan(matchId: string): Promise<LearningPlan> {
 // 更新学习任务状态（todo: 待开始 / in_progress: 进行中 / done: 已完成）
 export function updateTaskStatus(taskId: number, status: LearningTask['status']): Promise<LearningTask> {
   return api.patch<LearningTask>(`/match/plan/tasks/${taskId}`, { status }).then(r => r.data)
+}
+
+// 获取学习任务的学习内容（关联知识点 + 练习题）
+export function getTaskStudy(taskId: number): Promise<TaskStudy> {
+  return api.get<TaskStudy>(`/match/plan/tasks/${taskId}/study`).then(r => r.data)
 }
 
 // 创建匹配（保留旧接口）

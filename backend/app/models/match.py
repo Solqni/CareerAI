@@ -86,5 +86,7 @@ class LearningTask(Base):
     estimated_days = Column(Integer, nullable=True)  # 预估时长（天）
     status = Column(String(32), default="todo")
     due_date = Column(String(32), nullable=True)
+    # 学习内容缓存：{"questions": [{"question", "reference_answer"}], "source": "llm"}
+    study_json = Column(JSON, nullable=True)
 
     plan = relationship("LearningPlan", back_populates="tasks")
