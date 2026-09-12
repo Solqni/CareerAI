@@ -29,8 +29,9 @@ export interface OptimizeResponse {
 }
 
 // 生成简历优化建议（M4：关键词优化/经历量化/内容增强/结构建议）
+// 生成含 LLM 调用与 RAG 检索（实测 10-70s+），超时放宽到 3 分钟
 export function optimizeResume(data: { job_id: number; resume_id?: number }): Promise<OptimizeResponse> {
-  return api.post<OptimizeResponse>('/optimize', data).then(r => r.data)
+  return api.post<OptimizeResponse>('/optimize', data, { timeout: 180000 }).then(r => r.data)
 }
 
 // 优化维度显示配置
