@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import BackButton from '@/components/BackButton.vue'
 import { useResumeStore } from '@/stores/resume'
 import { useJobStore } from '@/stores/job'
 import { useMatchStore } from '@/stores/match'
+import { getLearningProgress, type LearningProgress } from '@/api/match'
 
 const router = useRouter()
 const resumeStore = useResumeStore()
@@ -27,7 +28,51 @@ const stats = ref([
   { label: '匹配分析', target: 0, suffix: '次', current: 0, color: '#43e97b', icon: 'M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11' },
 ])
 
+// 学习进度（真实数据：最新学习计划的完成度）
+const learningProgress = ref<LearningProgress | null>(null)
 const progress = ref(0)
+
+const TASK_STATUS: Record<string, string> = {
+  done: '已完成',
+  in_progress: '进行中',
+  todo: '待开始',
+}
+function taskStatusLabel(status: string) {
+  return TASK_STATUS[status] ?? status
+}
+
+// 能力画像雷达（真实技能：取简历解析技能按熟练度前 6 项）
+const radarSkills = computed<any[]>(() => {
+  const skills = resumeStore.profile?.skills
+  if (!Array.isArray(skills)) return []
+  return [...skills]
+    .sort((a: any, b: any) => (b.proficiency || 0) - (a.proficiency || 0))
+    .slice(0, 6)
+})
+const radarPoints = computed(() => {
+  const n = radarSkills.value.length
+  if (n < 3) return ''
+  return radarSkills.value
+    .map((s: any, i: number) => {
+      const ang = ((-90 + (360 / n) * i) * Math.PI) / 180
+      const r = 10 + ((s.proficiency || 0) / 5) * 30
+      return `${(50 + r * Math.cos(ang)).toFixed(1)},${(50 + r * Math.sin(ang)).toFixed(1)}`
+    })
+    .join(' ')
+})
+const radarLabels = computed(() => {
+  const n = radarSkills.value.length
+  if (n < 3) return []
+  return radarSkills.value.map((s: any, i: number) => {
+    const ang = ((-90 + (360 / n) * i) * Math.PI) / 180
+    return {
+      name: s.skill_name,
+      prof: s.proficiency,
+      x: 50 + 48 * Math.cos(ang),
+      y: 50 + 48 * Math.sin(ang),
+    }
+  })
+})
 
 function animateNumbers() {
   stats.value.forEach((s, idx) => {
@@ -41,17 +86,18 @@ function animateNumbers() {
     }
     requestAnimationFrame(step)
   })
-  // 进度条动画
-  setTimeout(() => { progress.value = Math.min(stats.value[1].target, 100) }, 300)
 }
 
 onMounted(async () => {
   try {
-    // 并行获取用户实时数据：能力画像 + 岗位分析 + 匹配报告
+    // 并行获取用户实时数据：能力画像 + 岗位分析 + 匹配报告 + 学习进度
     await Promise.all([
       resumeStore.fetchProfile(),
       jobStore.fetchJobs(),
-      matchStore.fetchMatches()
+      matchStore.fetchMatches(),
+      getLearningProgress()
+        .then(p => { learningProgress.value = p })
+        .catch(err => console.error('获取学习进度失败:', err)),
     ])
 
     // 更新统计数据
@@ -95,8 +141,8 @@ function updateStats() {
   // 匹配分析次数
   stats.value[3].target = matches?.length || 0
 
-  // 更新进度条（以平均匹配度为进度）
-  progress.value = Math.min(avgMatch, 100)
+  // 学习进度条：真实学习计划完成度
+  progress.value = learningProgress.value?.has_plan ? learningProgress.value.progress : 0
 }
 </script>
 
@@ -153,35 +199,63 @@ function updateStats() {
       </div>
 
       <div class="panels">
-        <!-- 学习进度 -->
+        <!-- 学习进度（真实学习计划数据） -->
         <div class="panel anim-fade-up anim-delay-3">
           <h3>学习进度</h3>
-          <div class="progress-track">
-            <div class="progress-fill" :style="{ width: progress + '%' }"></div>
-          </div>
-          <div class="progress-meta">
-            <span>Python 基础强化</span>
-            <strong>{{ progress }}%</strong>
-          </div>
-          <div class="task-list">
-            <div class="task done"><span class="dot"></span>复习 Python 装饰器<span class="tag">已完成</span></div>
-            <div class="task doing"><span class="dot"></span>LeetCode 链表专项<span class="tag">进行中</span></div>
-            <div class="task todo"><span class="dot"></span>八股文：HTTP 缓存<span class="tag">待开始</span></div>
+          <template v-if="learningProgress?.has_plan">
+            <div class="progress-track">
+              <div class="progress-fill" :style="{ width: progress + '%' }"></div>
+            </div>
+            <div class="progress-meta">
+              <span>{{ learningProgress.position_title || '学习计划' }}</span>
+              <strong>{{ learningProgress.done_tasks }}/{{ learningProgress.total_tasks }}（{{ progress }}%）</strong>
+            </div>
+            <div class="task-list">
+              <div
+                v-for="t in learningProgress.tasks"
+                :key="t.id"
+                class="task"
+                :class="t.status"
+              >
+                <span class="dot"></span>{{ t.task_name }}
+                <span class="tag">{{ taskStatusLabel(t.status) }}</span>
+              </div>
+            </div>
+            <button class="plan-link" @click="router.push('/match')">查看完整学习计划 →</button>
+          </template>
+          <div v-else class="plan-empty">
+            <p>暂无学习计划</p>
+            <span>完成一次能力匹配分析后，将自动生成针对性学习计划</span>
+            <button @click="router.push('/match')">去做能力匹配</button>
           </div>
         </div>
 
-        <!-- 能力雷达占位 -->
+        <!-- 能力画像（真实技能雷达） -->
         <div class="panel anim-fade-up anim-delay-4">
           <h3>能力画像概览</h3>
-          <div class="radar">
-            <div class="radar-ring r1"></div>
-            <div class="radar-ring r2"></div>
-            <div class="radar-ring r3"></div>
-            <svg class="radar-shape" viewBox="0 0 100 100">
-              <polygon points="50,12 82,32 74,72 50,88 26,72 18,32" fill="rgba(102,126,234,0.25)" stroke="#667eea" stroke-width="2" />
-            </svg>
-          </div>
-          <p class="radar-note">技能 · 经验 · 学历 · 项目 · 软实力</p>
+          <template v-if="radarSkills.length >= 3">
+            <div class="radar">
+              <div class="radar-ring r1"></div>
+              <div class="radar-ring r2"></div>
+              <div class="radar-ring r3"></div>
+              <svg class="radar-shape" viewBox="0 0 100 100">
+                <polygon
+                  :points="radarPoints"
+                  fill="rgba(102,126,234,0.25)"
+                  stroke="#667eea"
+                  stroke-width="2"
+                />
+              </svg>
+              <span
+                v-for="(l, i) in radarLabels"
+                :key="i"
+                class="radar-label"
+                :style="{ left: l.x + '%', top: l.y + '%' }"
+              >{{ l.name }} {{ l.prof }}</span>
+            </div>
+            <p class="radar-note">基于简历解析的 {{ radarSkills.length }} 项核心技能（满分 5）</p>
+          </template>
+          <p v-else class="radar-note empty">上传并解析简历后，将展示你的真实能力画像</p>
         </div>
 
         <!-- 快捷入口 -->
@@ -348,16 +422,38 @@ function updateStats() {
 .task:hover { transform: translateX(4px); background: rgba(255,255,255,0.7); }
 .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .task.done .dot { background: #43e97b; }
-.task.doing .dot { background: #4facfe; animation: pulse 1.6s ease infinite; }
+.task.in_progress .dot { background: #4facfe; animation: pulse 1.6s ease infinite; }
 .task.todo .dot { background: #cbd5e0; }
-.tag { margin-left: auto; font-size: 0.72rem; padding: 0.15rem 0.55rem; border-radius: 999px; background: #fff; border: 1px solid #e2e8f0; color: #718096; }
+.tag { margin-left: auto; font-size: 0.72rem; padding: 0.15rem 0.55rem; border-radius: 999px; background: #fff; border: 1px solid #e2e8f0; color: #718096; flex-shrink: 0; }
+.plan-link {
+  margin-top: 1rem; background: none; border: none; color: var(--primary);
+  font-size: 0.85rem; font-weight: 600; cursor: pointer; padding: 0;
+}
+.plan-link:hover { text-decoration: underline; }
+.plan-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem; padding: 1rem 0; }
+.plan-empty p { font-weight: 700; color: #2d3748; }
+.plan-empty span { color: #a0aec0; font-size: 0.85rem; line-height: 1.6; }
+.plan-empty button {
+  margin-top: 0.4rem; background: linear-gradient(135deg, var(--primary), var(--secondary));
+  color: #fff; border: none; border-radius: 8px; padding: 0.5rem 1.2rem;
+  font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: transform 0.2s ease;
+}
+.plan-empty button:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(102,126,234,0.3); }
 
-/* 雷达占位 */
+/* 能力画像雷达 */
 .radar {
   position: relative;
   width: 180px; height: 180px;
   margin: 0.5rem auto 0.8rem;
 }
+.radar-label {
+  position: absolute; transform: translate(-50%, -50%);
+  font-size: 0.68rem; font-weight: 600; color: #4a5568;
+  background: rgba(255,255,255,0.9); border: 1px solid #e2e8f0;
+  border-radius: 999px; padding: 0.05rem 0.45rem; white-space: nowrap;
+  pointer-events: none;
+}
+.radar-note.empty { padding: 2rem 0; }
 .radar-ring {
   position: absolute;
   border: 1px dashed #cbd5e0;

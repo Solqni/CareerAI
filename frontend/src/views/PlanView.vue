@@ -2,7 +2,14 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useMatchStore } from '@/stores/match'
-import { getTaskStudy, type LearningTask, type TaskStudy } from '@/api/match'
+import {
+  getTaskStudy,
+  refreshTaskStudy,
+  submitTaskAnswer,
+  type LearningTask,
+  type TaskStudy,
+  type StudyQuestionItem
+} from '@/api/match'
 import BackButton from '@/components/BackButton.vue'
 
 const router = useRouter()
@@ -62,7 +69,14 @@ async function toggleStudy(task: LearningTask) {
   if (studyMap.value[id] || studyErrors.value[id]) return
   loadingStudyId.value = id
   try {
-    studyMap.value = { ...studyMap.value, [id]: await getTaskStudy(id) }
+    const study = await getTaskStudy(id)
+    studyMap.value = { ...studyMap.value, [id]: study }
+    // 已有作答记录时预填草稿
+    const drafts: Record<string, string> = {}
+    for (const [q, a] of Object.entries(study.answers || {})) drafts[q] = a.answer
+    if (Object.keys(drafts).length) {
+      draftAnswers.value = { ...draftAnswers.value, [id]: drafts }
+    }
   } catch (err: any) {
     studyErrors.value = {
       ...studyErrors.value,
@@ -72,6 +86,86 @@ async function toggleStudy(task: LearningTask) {
   } finally {
     loadingStudyId.value = null
   }
+}
+
+// 答题练习：草稿输入 → 提交 AI 点评 → 换一批新题（题库式循环练习）
+const draftAnswers = ref<Record<number, Record<string, string>>>({})
+const submittingQ = ref<string | null>(null)
+const refreshingId = ref<number | null>(null)
+const actionErrors = ref<Record<number, string>>({})
+
+function draftAnswer(taskId: number, question: string): string {
+  return draftAnswers.value[taskId]?.[question] ?? ''
+}
+
+function setDraft(taskId: number, question: string, e: Event) {
+  const val = (e.target as HTMLTextAreaElement).value
+  draftAnswers.value = {
+    ...draftAnswers.value,
+    [taskId]: { ...(draftAnswers.value[taskId] || {}), [question]: val }
+  }
+}
+
+async function submitAnswer(task: LearningTask, q: StudyQuestionItem) {
+  const text = draftAnswer(task.id, q.question).trim()
+  if (!text || submittingQ.value === q.question) return
+  submittingQ.value = q.question
+  try {
+    const fb = await submitTaskAnswer(task.id, q.question, text)
+    const cur = studyMap.value[task.id]
+    if (cur) {
+      studyMap.value = {
+        ...studyMap.value,
+        [task.id]: {
+          ...cur,
+          answers: {
+            ...cur.answers,
+            [q.question]: { answer: text, feedback: fb.feedback, score: fb.score ?? null }
+          }
+        }
+      }
+    }
+  } catch (err: any) {
+    actionErrors.value = {
+      ...actionErrors.value,
+      [task.id]: err.response?.data?.detail || '点评生成失败，请稍后重试'
+    }
+  } finally {
+    submittingQ.value = null
+  }
+}
+
+async function refreshQuestions(task: LearningTask) {
+  if (refreshingId.value === task.id) return
+  refreshingId.value = task.id
+  try {
+    const study = await refreshTaskStudy(task.id)
+    studyMap.value = { ...studyMap.value, [task.id]: study }
+    const drafts = { ...draftAnswers.value }
+    delete drafts[task.id]
+    draftAnswers.value = drafts
+    const errors = { ...actionErrors.value }
+    delete errors[task.id]
+    actionErrors.value = errors
+  } catch (err: any) {
+    actionErrors.value = {
+      ...actionErrors.value,
+      [task.id]: err.response?.data?.detail || '新题生成失败，请稍后重试'
+    }
+  } finally {
+    refreshingId.value = null
+  }
+}
+
+function feedbackFor(taskId: number, question: string) {
+  return studyMap.value[taskId]?.answers?.[question] ?? null
+}
+
+function scoreClass(score?: number | null) {
+  if (score == null) return 'mid'
+  if (score >= 80) return 'good'
+  if (score >= 60) return 'mid'
+  return 'bad'
 }
 
 function studySourceLabel(source?: string) {
@@ -227,14 +321,54 @@ const statusMeta: Record<string, { label: string; color: string }> = {
                   </div>
 
                   <div class="study-section">
-                    <h5>练习题目 <span class="study-tag dim">{{ studySourceLabel(studyMap[task.id].source) }}</span></h5>
+                    <div class="questions-header">
+                      <h5>
+                        练习题目
+                        <span class="study-tag dim">{{ studySourceLabel(studyMap[task.id].source) }}</span>
+                        <span v-if="studyMap[task.id].total_generated" class="study-tag dim">
+                          第 {{ studyMap[task.id].batch }} 批 · 累计 {{ studyMap[task.id].total_generated }} 题
+                        </span>
+                      </h5>
+                      <button
+                        v-if="studyMap[task.id].questions.length"
+                        class="action-btn refresh"
+                        :disabled="refreshingId === task.id"
+                        @click="refreshQuestions(task)"
+                      >{{ refreshingId === task.id ? '正在出新题...' : '换一批新题' }}</button>
+                    </div>
+                    <div v-if="actionErrors[task.id]" class="study-error">{{ actionErrors[task.id] }}</div>
                     <ol v-if="studyMap[task.id].questions.length" class="question-list">
                       <li v-for="(q, i) in studyMap[task.id].questions" :key="i" class="question-item">
-                        <p class="question-text">{{ q.question }}</p>
-                        <details class="answer-box">
-                          <summary>查看参考答案</summary>
-                          <p>{{ q.reference_answer || '（暂无参考答案）' }}</p>
-                        </details>
+                        <p class="question-text">{{ i + 1 }}. {{ q.question }}</p>
+
+                        <!-- 作答输入区 -->
+                        <div class="answer-input-area">
+                          <textarea
+                            rows="3"
+                            placeholder="输入你的答案，提交后 AI 将给出点评..."
+                            :value="draftAnswer(task.id, q.question)"
+                            @input="setDraft(task.id, q.question, $event)"
+                          ></textarea>
+                          <div class="answer-actions">
+                            <button
+                              class="submit-answer"
+                              :disabled="!draftAnswer(task.id, q.question).trim() || submittingQ === q.question"
+                              @click="submitAnswer(task, q)"
+                            >{{ submittingQ === q.question ? 'AI 点评中...' : feedbackFor(task.id, q.question) ? '重新提交' : '提交答案' }}</button>
+                            <details class="answer-box">
+                              <summary>查看参考答案</summary>
+                              <p>{{ q.reference_answer || '（暂无参考答案）' }}</p>
+                            </details>
+                          </div>
+                        </div>
+
+                        <!-- AI 点评 -->
+                        <div v-if="feedbackFor(task.id, q.question)" class="feedback-box">
+                          <span class="score" :class="scoreClass(feedbackFor(task.id, q.question)!.score)">
+                            {{ feedbackFor(task.id, q.question)!.score != null ? `得分 ${feedbackFor(task.id, q.question)!.score}` : '已点评' }}
+                          </span>
+                          <p class="feedback-text">{{ feedbackFor(task.id, q.question)!.feedback }}</p>
+                        </div>
                       </li>
                     </ol>
                     <p v-else class="study-empty">练习题生成失败或暂不可用，可先学习上方知识点</p>
@@ -359,12 +493,47 @@ h2 { font-size: 1.8rem; color: #1a202c; margin-bottom: 1.5rem; }
 .knowledge-item { background: rgba(6,182,212,0.06); border-left: 3px solid #06b6d4; border-radius: 8px; padding: 0.7rem 0.9rem; }
 .knowledge-content { color: #4a5568; font-size: 0.88rem; line-height: 1.7; white-space: pre-wrap; }
 .knowledge-meta { color: #0e7490; font-size: 0.78rem; margin-top: 0.3rem; }
-.question-list { display: flex; flex-direction: column; gap: 0.7rem; padding-left: 1.2rem; }
+.question-list { display: flex; flex-direction: column; gap: 1rem; padding-left: 1.2rem; }
 .question-item { color: #2d3748; font-size: 0.92rem; }
-.question-text { line-height: 1.6; margin-bottom: 0.3rem; }
+.question-text { line-height: 1.6; margin-bottom: 0.5rem; font-weight: 600; }
+.questions-header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 0.7rem; }
+.questions-header h5 { margin-bottom: 0; }
+.action-btn.refresh { background: #06b6d4; padding: 0.4rem 0.9rem; font-size: 0.8rem; flex-shrink: 0; }
+.answer-input-area textarea {
+  width: 100%; box-sizing: border-box; border: 1px solid #e2e8f0; border-radius: 10px;
+  padding: 0.7rem 0.9rem; font-size: 0.88rem; font-family: inherit; line-height: 1.6;
+  resize: vertical; min-height: 72px; transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  background: #fff;
+}
+.answer-input-area textarea:focus {
+  outline: none; border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(102,126,234,0.12);
+}
+.answer-actions { display: flex; align-items: center; gap: 1rem; margin-top: 0.5rem; flex-wrap: wrap; }
+.submit-answer {
+  background: linear-gradient(135deg, var(--primary), var(--secondary)); color: #fff;
+  border: none; border-radius: 8px; padding: 0.45rem 1.1rem; font-size: 0.85rem;
+  font-weight: 600; cursor: pointer; transition: all 0.2s ease; white-space: nowrap;
+}
+.submit-answer:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(102,126,234,0.3); }
+.submit-answer:disabled { opacity: 0.5; cursor: not-allowed; }
+.answer-box { font-size: 0.85rem; }
 .answer-box summary { color: var(--primary); font-size: 0.85rem; cursor: pointer; font-weight: 600; }
 .answer-box summary:hover { text-decoration: underline; }
 .answer-box p { color: #4a5568; background: #f7fafc; border-radius: 8px; padding: 0.7rem 0.9rem; margin-top: 0.4rem; line-height: 1.7; font-size: 0.88rem; }
+.feedback-box {
+  margin-top: 0.6rem; background: rgba(102,126,234,0.06);
+  border-left: 3px solid var(--primary); border-radius: 8px; padding: 0.7rem 0.9rem;
+  display: flex; align-items: flex-start; gap: 0.8rem;
+}
+.feedback-box .score {
+  flex-shrink: 0; font-size: 0.78rem; font-weight: 700; padding: 0.2rem 0.7rem;
+  border-radius: 999px; margin-top: 0.1rem;
+}
+.feedback-box .score.good { background: rgba(16,185,129,0.15); color: #059669; }
+.feedback-box .score.mid { background: rgba(245,158,11,0.15); color: #d97706; }
+.feedback-box .score.bad { background: rgba(239,68,68,0.15); color: #dc2626; }
+.feedback-text { color: #4a5568; font-size: 0.88rem; line-height: 1.7; }
 .study-empty { color: #a0aec0; font-size: 0.88rem; }
 .study-error { color: #ef4444; font-size: 0.9rem; }
 .study-loading { display: flex; align-items: center; gap: 0.6rem; color: #718096; font-size: 0.9rem; }

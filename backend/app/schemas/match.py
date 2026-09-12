@@ -121,11 +121,43 @@ class TaskStatusUpdate(BaseModel):
     status: TaskStatus = Field(..., description="任务状态：todo / in_progress / done")
 
 
+class TaskAnswerIn(BaseModel):
+    """练习题作答请求"""
+    question: str = Field(..., min_length=1, description="题目文本（需为当前批练习题之一）")
+    answer: str = Field(..., min_length=1, description="用户作答内容")
+
+
+class ProgressTaskItem(BaseModel):
+    """仪表盘学习进度任务项"""
+    id: int
+    task_name: str
+    status: str = "todo"
+    priority: str = "medium"
+
+
+class LearningProgressOut(BaseModel):
+    """仪表盘学习进度（取用户最新一份学习计划）"""
+    has_plan: bool = Field(False, description="是否存在学习计划")
+    position_title: Optional[str] = Field(None, description="对应匹配报告的岗位名称")
+    total_tasks: int = Field(0, description="任务总数")
+    done_tasks: int = Field(0, description="已完成任务数")
+    in_progress_tasks: int = Field(0, description="进行中任务数")
+    progress: int = Field(0, ge=0, le=100, description="完成进度百分比")
+    tasks: List[ProgressTaskItem] = Field(default_factory=list, description="任务列表（按优先级）")
+
+
 class StudyKnowledgeItem(BaseModel):
     """学习内容关联的知识点（来自平台管理员知识库 RAG 检索）"""
     content: str = Field(..., description="知识片段内容")
     doc_title: str = Field(..., description="来源文档标题")
     similarity: float = Field(..., description="与任务的相关度")
+
+
+class StudyAnswerFeedback(BaseModel):
+    """练习题作答记录与 AI 点评"""
+    answer: str = Field("", description="用户作答内容")
+    feedback: str = Field("", description="AI 点评")
+    score: Optional[int] = Field(None, description="得分（0-100）")
 
 
 class StudyQuestionItem(BaseModel):
@@ -142,6 +174,11 @@ class TaskStudyOut(BaseModel):
         default_factory=list, description="关联知识点（管理员知识库检索）"
     )
     questions: List[StudyQuestionItem] = Field(
-        default_factory=list, description="练习题目（首次生成后缓存）"
+        default_factory=list, description="当前一批练习题（首次生成后缓存）"
     )
+    answers: dict[str, StudyAnswerFeedback] = Field(
+        default_factory=dict, description="作答记录（题目文本 → 作答与点评）"
+    )
+    batch: int = Field(1, description="当前第几批题目（换一批后递增）")
+    total_generated: int = Field(0, description="累计生成过的题目总数")
     source: str = Field("rag_only", description="题目来源：cache（缓存）/ llm（新生成）/ rag_only（仅知识点）")
