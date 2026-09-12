@@ -12,7 +12,8 @@ export interface Job {
 }
 
 export function parseJobDescription(jdText: string) {
-  return api.post('/jobs/parse', { jd_text: jdText })
+  // LLM 解析 JD 可能耗时较长，放宽超时
+  return api.post('/jobs/parse', { jd_text: jdText }, { timeout: 180000 })
 }
 
 // 上传 JD 截图，视觉模型识别后解析

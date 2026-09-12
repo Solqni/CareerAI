@@ -134,7 +134,8 @@ export interface LearningPlan {
 
 // 分析匹配度
 export function analyzeMatch(data: MatchAnalysisRequest): Promise<MatchAnalysisResult> {
-  return api.post<MatchAnalysisResult>('/match/analyze', data).then(r => r.data)
+  // 完整匹配含 LLM 学习计划生成（实测 1-2 分钟），放宽超时到 5 分钟
+  return api.post<MatchAnalysisResult>('/match/analyze', data, { timeout: 300000 }).then(r => r.data)
 }
 
 // 获取匹配列表
@@ -162,14 +163,17 @@ export function updateTaskStatus(taskId: number, status: LearningTask['status'])
   return api.patch<LearningTask>(`/match/plan/tasks/${taskId}`, { status }).then(r => r.data)
 }
 
-// 获取学习任务的学习内容（关联知识点 + 当前一批练习题 + 作答记录）
+// 学习内容相关接口需现场调用 LLM（出题/点评耗时 10~70s），超时放宽到 3 分钟
+const LLM_TIMEOUT = 180000
+
+// 获取学习任务的学习内容（关联知识点 + 当前一批练习题 + 作答记录；无缓存题目时会现场生成）
 export function getTaskStudy(taskId: number): Promise<TaskStudy> {
-  return api.get<TaskStudy>(`/match/plan/tasks/${taskId}/study`).then(r => r.data)
+  return api.get<TaskStudy>(`/match/plan/tasks/${taskId}/study`, { timeout: LLM_TIMEOUT }).then(r => r.data)
 }
 
 // 换一批新题（旧题并入历史，新题不与历史重复，作答记录清空）
 export function refreshTaskStudy(taskId: number): Promise<TaskStudy> {
-  return api.post<TaskStudy>(`/match/plan/tasks/${taskId}/study/refresh`).then(r => r.data)
+  return api.post<TaskStudy>(`/match/plan/tasks/${taskId}/study/refresh`, null, { timeout: LLM_TIMEOUT }).then(r => r.data)
 }
 
 // 提交练习题作答，返回 AI 点评（得分 + 反馈）
@@ -179,7 +183,7 @@ export function submitTaskAnswer(
   answer: string
 ): Promise<{ question: string; answer: string; feedback: string; score?: number | null }> {
   return api
-    .post(`/match/plan/tasks/${taskId}/study/answer`, { question, answer })
+    .post(`/match/plan/tasks/${taskId}/study/answer`, { question, answer }, { timeout: LLM_TIMEOUT })
     .then(r => r.data)
 }
 
