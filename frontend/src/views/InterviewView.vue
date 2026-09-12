@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import BackButton from '@/components/BackButton.vue'
 import { useJobStore } from '@/stores/job'
 import { useResumeStore } from '@/stores/resume'
@@ -16,6 +16,7 @@ import {
 } from '@/api/interview'
 
 const route = useRoute()
+const router = useRouter()
 const jobStore = useJobStore()
 const resumeStore = useResumeStore()
 
@@ -211,6 +212,13 @@ function backToSetup() {
         <h2>面试准备</h2>
         <p>AI 扮演面试官进行多轮对话，每轮从逻辑性、完整性、专业性评估，结束生成总评报告</p>
       </div>
+      <button class="btn-ghost header-dashboard" @click="router.push('/')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+          <polyline points="9 22 9 12 15 12 15 22" />
+        </svg>
+        返回仪表盘
+      </button>
     </div>
 
     <!-- ============ 准备阶段：建会话 ============ -->
@@ -449,6 +457,13 @@ function backToSetup() {
 .header-icon svg { width: 28px; height: 28px; }
 .page-header h2 { font-size: 1.5rem; color: #1a202c; }
 .page-header p { font-size: 0.9rem; color: #718096; margin-top: 0.25rem; }
+.header-dashboard {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.header-dashboard svg { width: 14px; height: 14px; }
 
 /* 特性提示 */
 .tips { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.8rem; margin-bottom: 1.4rem; }
