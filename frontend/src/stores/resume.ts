@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { getProfile, getResumes, parseResumeText, uploadResumeFile, type ResumeListItem } from '@/api/resume'
+import { addSkill as addSkillApi, deleteSkill as deleteSkillApi, getProfile, getResumes, parseResumeText, uploadResumeFile, type ResumeListItem } from '@/api/resume'
 
 export const useResumeStore = defineStore('resume', () => {
   const profile = ref<any>(null)
@@ -67,12 +67,12 @@ export const useResumeStore = defineStore('resume', () => {
     }
   }
 
-  // 添加技能
-  async function addSkill(_skill: { skill_name: string; proficiency: number }) {
+  // 添加技能（手动，POST /resume/skills）
+  async function addSkill(skill: { skill_name: string; proficiency: number }) {
     try {
       loading.value = true
       error.value = ''
-      // TODO: 实现添加技能的API调用
+      await addSkillApi(skill)
       await fetchProfile()
     } catch (err: any) {
       error.value = err.response?.data?.detail || '添加技能失败'
@@ -82,12 +82,12 @@ export const useResumeStore = defineStore('resume', () => {
     }
   }
 
-  // 删除技能
-  async function deleteSkill(_skillId: number) {
+  // 删除技能（DELETE /resume/skills/{id}）
+  async function deleteSkill(skillId: number) {
     try {
       loading.value = true
       error.value = ''
-      // TODO: 实现删除技能的API调用
+      await deleteSkillApi(skillId)
       await fetchProfile()
     } catch (err: any) {
       error.value = err.response?.data?.detail || '删除技能失败'

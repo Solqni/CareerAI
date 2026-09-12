@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { parseJobDescription, parseJobImage, getJobs, createJob, type Job } from '@/api/job'
+import { parseJobDescription, parseJobImage, getJobs, createJob, deleteJob as deleteJobApi, type Job } from '@/api/job'
 
 export const useJobStore = defineStore('job', () => {
   const jobs = ref<Job[]>([])
@@ -95,12 +95,12 @@ export const useJobStore = defineStore('job', () => {
     }
   }
 
-  // 删除岗位
+  // 删除岗位（真实调用后端，级联清理报告链）
   async function deleteJob(jobId: number) {
     try {
       loading.value = true
       error.value = ''
-      // TODO: 实现删除岗位的API调用
+      await deleteJobApi(jobId)
       jobs.value = jobs.value.filter(j => j.id !== jobId)
       if (currentJob.value?.id === jobId) {
         currentJob.value = null

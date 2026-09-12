@@ -36,3 +36,8 @@ export function createJob(data: Partial<Job>): Promise<Job> {
 export function getJob(jobId: number) {
   return api.get(`/jobs/${jobId}`)
 }
+
+/** 删除本人岗位分析（后端级联清理其报告/学习计划链，解除面试会话引用） */
+export function deleteJob(jobId: number) {
+  return api.delete(`/jobs/${jobId}`)
+}

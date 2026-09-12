@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import BackButton from '@/components/BackButton.vue'
 import { useResumeStore } from '@/stores/resume'
@@ -165,6 +165,44 @@ async function handleDeleteResume(item: ResumeListItem) {
 
 function fmtDate(d: string) {
   return new Date(d).toLocaleString('zh-CN', { hour12: false })
+}
+
+// 技能管理：手动添加/删除技能（user_skill 表，来源标记 manual/简历解析）
+const newSkillName = ref('')
+const newSkillLevel = ref(3)
+const addingSkill = ref(false)
+const deletingSkillId = ref<number | null>(null)
+
+const userSkills = computed<any[]>(() => resumeStore.profile?.skills ?? [])
+
+async function handleAddSkill() {
+  const name = newSkillName.value.trim()
+  if (!name) return
+  addingSkill.value = true
+  errorMsg.value = ''
+  try {
+    await resumeStore.addSkill({ skill_name: name, proficiency: newSkillLevel.value })
+    newSkillName.value = ''
+  } catch (e: any) {
+    errorMsg.value = e.response?.data?.detail || '添加技能失败'
+    console.error('添加技能失败:', e)
+  } finally {
+    addingSkill.value = false
+  }
+}
+
+async function handleDeleteSkill(skill: any) {
+  if (deletingSkillId.value) return
+  deletingSkillId.value = skill.id
+  errorMsg.value = ''
+  try {
+    await resumeStore.deleteSkill(skill.id)
+  } catch (e: any) {
+    errorMsg.value = e.response?.data?.detail || '删除技能失败'
+    console.error('删除技能失败:', e)
+  } finally {
+    deletingSkillId.value = null
+  }
 }
 
 // 初始化时获取已保存的简历数据
@@ -450,6 +488,48 @@ onMounted(async () => {
       </div>
     </div>
 
+    <!-- 技能管理：手动添加/删除技能 -->
+    <div class="result-card anim-fade-up">
+      <div class="result-header">
+        <h3>技能管理</h3>
+      </div>
+      <div class="skill-add-form">
+        <input
+          v-model="newSkillName"
+          placeholder="输入技能名称，如：Python"
+          maxlength="50"
+          @keyup.enter="handleAddSkill"
+        />
+        <select v-model.number="newSkillLevel">
+          <option v-for="(label, i) in ['初学', '了解', '熟悉', '熟练', '精通']" :key="i" :value="i + 1">{{ label }}</option>
+        </select>
+        <button class="btn" :disabled="addingSkill || !newSkillName.trim()" @click="handleAddSkill">
+          <span v-if="addingSkill" class="spinner"></span>
+          添加技能
+        </button>
+      </div>
+      <div v-if="!userSkills.length" class="study-empty">暂无技能记录，解析简历或手动添加后会在此列出</div>
+      <ul v-else class="user-skill-list">
+        <li v-for="skill in userSkills" :key="skill.id" class="user-skill-item">
+          <div class="user-skill-info">
+            <strong>{{ skill.skill_name }}</strong>
+            <small>{{ proficiencyLabel(skill.proficiency) }}</small>
+          </div>
+          <div class="user-skill-actions">
+            <span class="skill-source" :class="{ manual: skill.source === 'manual' }">{{ skill.source === 'manual' ? '手动添加' : '简历解析' }}</span>
+            <button
+              class="skill-remove"
+              :disabled="deletingSkillId === skill.id"
+              @click="handleDeleteSkill(skill)"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              {{ deletingSkillId === skill.id ? '删除中...' : '删除' }}
+            </button>
+          </div>
+        </li>
+      </ul>
+    </div>
+
     <!-- 我的简历：历史列表管理 -->
     <div class="result-card anim-fade-up">
       <div class="result-header">
@@ -659,6 +739,46 @@ onMounted(async () => {
 .resume-delete svg { width: 14px; height: 14px; }
 .resume-delete:hover:not(:disabled) { background: #fff5f5; }
 .resume-delete:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* 技能管理 */
+.skill-add-form {
+  display: flex; gap: 0.6rem; margin-bottom: 1rem; flex-wrap: wrap;
+}
+.skill-add-form input {
+  flex: 1; min-width: 180px;
+  border: 1px solid #e2e8f0; border-radius: 8px;
+  padding: 0.55rem 0.8rem; font-size: 0.9rem; outline: none;
+}
+.skill-add-form input:focus { border-color: #764ba2; }
+.skill-add-form select {
+  border: 1px solid #e2e8f0; border-radius: 8px;
+  padding: 0.55rem 0.6rem; font-size: 0.9rem; background: #fff;
+}
+.user-skill-list { list-style: none; margin: 0; padding: 0; }
+.user-skill-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.8rem 0.2rem;
+  border-bottom: 1px solid #edf2f7;
+}
+.user-skill-item:last-child { border-bottom: none; }
+.user-skill-info { display: flex; align-items: baseline; gap: 0.6rem; }
+.user-skill-info strong { color: #1a202c; font-size: 0.92rem; }
+.user-skill-info small { color: #a0aec0; font-size: 0.78rem; }
+.user-skill-actions { display: flex; align-items: center; gap: 0.7rem; }
+.skill-source {
+  font-size: 0.75rem; color: #718096; background: #edf2f7;
+  border-radius: 999px; padding: 0.1rem 0.6rem;
+}
+.skill-source.manual { color: #4c51bf; background: #ebf4ff; }
+.skill-remove {
+  display: inline-flex; align-items: center; gap: 0.25rem;
+  background: none; border: 1px solid #e2e8f0; border-radius: 8px;
+  color: #718096; font-size: 0.8rem; padding: 0.3rem 0.6rem; cursor: pointer;
+  transition: all 0.2s;
+}
+.skill-remove svg { width: 12px; height: 12px; }
+.skill-remove:hover:not(:disabled) { color: #e53e3e; border-color: #fed7d7; background: #fff5f5; }
+.skill-remove:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* 解析结果 */
 .result-card {

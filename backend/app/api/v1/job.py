@@ -9,6 +9,7 @@ from app.api.deps import get_current_user, get_db
 from app.models import JobAnalysis, JobRequirement, User
 from app.schemas.job import JDParsedResult, JobListItem, JobOut, JobParseRequest
 from app.services.parsing import extract_jd_text_from_image, parse_jd
+from app.services.admin_ops import delete_job_cascade
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
@@ -151,9 +152,9 @@ async def delete_job(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """岗位知识库：删除一条岗位分析记录。"""
+    """岗位知识库：删除本人一条岗位分析记录（级联清理其报告/学习计划链，解除面试会话引用）。"""
     job = await _get_job_or_404(job_id, current_user, db)
-    await db.delete(job)
+    await delete_job_cascade(db, [job.id])
     await db.commit()
 
 

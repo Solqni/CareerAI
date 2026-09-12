@@ -92,3 +92,13 @@ export function updateResumeProfile(payload: {
 export function deleteResume(id: number) {
   return api.delete(`/resume/${id}`)
 }
+
+/** 手动添加技能（POST /resume/skills，source=manual） */
+export function addSkill(payload: { skill_name: string; proficiency: number }) {
+  return api.post('/resume/skills', payload).then(r => r.data)
+}
+
+/** 删除技能（DELETE /resume/skills/{id}） */
+export function deleteSkill(skillId: number) {
+  return api.delete(`/resume/skills/${skillId}`)
+}

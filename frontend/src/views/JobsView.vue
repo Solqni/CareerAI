@@ -17,6 +17,35 @@ const imageLoading = ref(false)
 const imageName = ref('')
 const imagePreview = ref('')
 
+// 我的岗位：列表管理（删除错析/过期岗位，避免下拉脏数据堆积）
+const deletingJobId = ref<number | null>(null)
+
+function jobTitle(job: any) {
+  return job?.position_title || job?.parsed_json?.position_title || `岗位 #${job?.id}`
+}
+
+function jobCompany(job: any) {
+  return job?.parsed_json?.company || ''
+}
+
+function fmtDate(d: string) {
+  return new Date(d).toLocaleDateString('zh-CN')
+}
+
+async function handleDeleteJob(job: any) {
+  if (deletingJobId.value) return
+  if (!window.confirm(`确定删除岗位「${jobTitle(job)}」吗？其关联的匹配报告与学习计划将一并删除，该操作不可恢复。`)) return
+  deletingJobId.value = job.id
+  try {
+    await jobStore.deleteJob(job.id)
+  } catch (e: any) {
+    errorMsg.value = e.response?.data?.detail || '删除失败'
+    console.error('删除岗位失败:', e)
+  } finally {
+    deletingJobId.value = null
+  }
+}
+
 // 初始化时获取已保存的岗位
 onMounted(async () => {
   try {
@@ -263,6 +292,35 @@ async function handleSave() {
         </div>
       </div>
     </div>
+
+    <!-- 我的岗位：列表管理 -->
+    <div class="result-card anim-fade-up">
+      <div class="result-header">
+        <h3>我的岗位</h3>
+      </div>
+      <div v-if="jobStore.loading" class="list-empty">加载中...</div>
+      <div v-else-if="!jobStore.jobs.length" class="list-empty">暂无岗位分析记录，上传 JD 或截图后会在此列出</div>
+      <ul v-else class="job-list">
+        <li v-for="job in jobStore.jobs" :key="job.id" class="job-item">
+          <div class="job-item-info">
+            <strong>{{ jobTitle(job) }}</strong>
+            <small>{{ [jobCompany(job), fmtDate(job.created_at)].filter(Boolean).join(' · ') }}</small>
+          </div>
+          <div class="job-item-actions">
+            <span v-if="job.is_shared" class="job-badge">平台共享</span>
+            <button
+              v-else
+              class="job-delete"
+              :disabled="deletingJobId === job.id"
+              @click="handleDeleteJob(job)"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              {{ deletingJobId === job.id ? '删除中...' : '删除' }}
+            </button>
+          </div>
+        </li>
+      </ul>
+    </div>
     </div>
   </div>
 </template>
@@ -477,6 +535,33 @@ async function handleSave() {
   font-size: 1.2rem; color: #1a202c; margin-bottom: 1.2rem;
   padding-bottom: 0.8rem; border-bottom: 1px solid #edf2f7;
 }
+
+/* 我的岗位列表 */
+.list-empty { color: #a0aec0; font-size: 0.9rem; text-align: center; padding: 1.2rem 0; }
+.job-list { list-style: none; margin: 0; padding: 0; }
+.job-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.9rem 0.2rem;
+  border-bottom: 1px solid #edf2f7;
+}
+.job-item:last-child { border-bottom: none; }
+.job-item-info { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; }
+.job-item-info strong { color: #1a202c; font-size: 0.95rem; }
+.job-item-info small { color: #a0aec0; font-size: 0.8rem; }
+.job-item-actions { display: flex; align-items: center; gap: 0.7rem; flex-shrink: 0; }
+.job-badge {
+  font-size: 0.75rem; color: #2c7a7b; background: #e6fffa;
+  border: 1px solid #b2f5ea; border-radius: 999px; padding: 0.1rem 0.6rem;
+}
+.job-delete {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  background: none; border: 1px solid #fed7d7; border-radius: 8px;
+  color: #e53e3e; font-size: 0.82rem; padding: 0.35rem 0.7rem; cursor: pointer;
+  transition: all 0.2s;
+}
+.job-delete svg { width: 14px; height: 14px; }
+.job-delete:hover:not(:disabled) { background: #fff5f5; }
+.job-delete:disabled { opacity: 0.5; cursor: not-allowed; }
 .result-section { margin-bottom: 1.6rem; }
 .result-section h4 {
   font-size: 0.95rem; color: #4a5568; margin-bottom: 0.6rem;
