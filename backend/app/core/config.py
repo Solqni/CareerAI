@@ -54,7 +54,9 @@ class Settings(BaseSettings):
     DEEPSEEK_EMBEDDING_MODEL: str = "text-embedding-v3"
     EMBEDDING_DIMENSIONS: int = 1024
     LLM_TEMPERATURE: float = 0.3
-    LLM_TIMEOUT: int = 60
+    # LLM 请求超时（秒）：出题/总评/匹配分析等长生成实测可超 60s，
+    # 需大于前端对应接口的超时预算内的 LLM 环节，避免后端先被砍掉返回 500
+    LLM_TIMEOUT: int = 240
 
     # RAG
     RAG_CHUNK_SIZE: int = 800
