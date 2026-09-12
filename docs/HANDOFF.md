@@ -17,13 +17,16 @@
 |------|------|------|
 | M1 | 注册登录 + 简历上传/解析 | ✅ 已合入 main |
 | M2 | 岗位 JD 解析 + RAG 知识库 + LangGraph Agent（4 tools） | ✅ 已合入 main（PR #6） |
-| M3 | 能力匹配（技能50/经验30/学历20）+ 差距识别 + LLM 学习计划 + 任务状态 | ✅ 开发完成，待合并 |
-| M4 | 简历优化四维度建议（关键词/量化/增强/结构，注入差距上下文） | ✅ 开发完成，待合并 |
-| 管理员 | 权限校验 + /admin/users、/admin/system 接口 + 三个管理页真实数据 | ✅ 开发完成，待合并 |
+| M3 | 能力匹配（技能50/经验30/学历20）+ 差距识别 + LLM 学习计划 + 任务状态 | ✅ 已合入 main（PR #7） |
+| M4 | 简历优化四维度建议（关键词/量化/增强/结构，注入差距上下文） | ✅ 已合入 main（PR #7） |
+| 管理员 | 权限校验 + /admin/users、/admin/system 接口 + 三个管理页真实数据 | ✅ 已合入 main（PR #7） |
+| M5 | 面试题生成（技术/项目/行为三类）+ 多轮模拟面试 + 逐轮三维度评估 + 总评报告 | ✅ 开发完成，待合并 |
 
-- **分支**：`feature-m3-match-optimize`（领先 main 3 个提交），**PR #7 待合并**：https://github.com/Solqni/CareerAI/pull/7
-- 关键新文件：backend `app/services/matching.py`、`app/services/optimization.py`、`app/api/v1/optimize.py`、`app/api/v1/admin.py`；frontend `PlanView.vue`、`OptimizeView.vue`、`MatchDetailView.vue`、`api/knowledge.ts`、`api/admin.ts`
-- 数据库注意：`learning_task` 表新增了 `priority`、`estimated_days` 列（已删表重建）；`Base.metadata.create_all` **不会**修改已存在的表结构，模型变更需手动 DROP 空表后重启
+- **需求只到 M5（五大模块），无 M6 规格**；M1~M5 全部开发完成
+- **分支**：`feature-m5-interview`（从含 PR #7 的 main 切出，待推送 + 开 PR）；main 已含 PR #7 全部内容
+- 关键新文件（M5）：backend `app/services/interview.py`、`app/tools/interview_helper.py`（generate_interview_q 工具）、`app/api/v1/interview.py`、`test_interview_api.py`；frontend `api/interview.ts`、`views/InterviewView.vue`（由演示动画改造为真实流程）
+- M3/4 关键文件：backend `app/services/matching.py`、`app/services/optimization.py`、`app/api/v1/optimize.py`、`app/api/v1/admin.py`；frontend `PlanView.vue`、`OptimizeView.vue`、`MatchDetailView.vue`、`api/knowledge.ts`、`api/admin.ts`
+- 数据库注意：`interview_session` 在文档字段外补了 `resume_id`、`summary`，`interview_qa` 补了 `category`、`feedback_json`（三维度评分明细）；`learning_task` 有 `priority`、`estimated_days`（均曾删空表重建）；`Base.metadata.create_all` **不会**修改已存在的表结构，模型变更需手动 DROP 空表后重启。当前库 17 张表（12 核心 + conversation/message/knowledge_document/document_chunk + recommendation）
 
 ## 3. 环境坑（重要，来自实际踩坑）
 
@@ -59,11 +62,18 @@ npm run dev   # http://localhost:5173
 | POST /api/v1/optimize | 简历优化建议（job_id 必填，resume_id 缺省取最新） |
 | GET /api/v1/resume/list | 当前用户简历列表（匹配/优化下拉用） |
 | POST /api/v1/admin/* | 管理员接口（403 拦非 admin） |
+| POST /api/v1/interview/questions | 仅生成面试题（job_id + 题量 3-9，三类均匀，约 10-30s） |
+| POST /api/v1/interview/session | 建面试会话并生成题库（返回 qas） |
+| GET /api/v1/interview/sessions、GET /interview/session/{id} | 面试历史列表 / 详情（含问答与评估） |
+| POST /api/v1/interview/session/{id}/answer | body {qa_id, answer}：LLM 三维度评估，返回本轮评估 + next_qa |
+| POST /api/v1/interview/session/{id}/finish | 结束面试，LLM 汇总总评写入 session.summary |
+
+M5 设计要点：面试多轮上下文从 `interview_qa` 表加载（Memory）；LLM 出题/评估/总评均有兜底（兜底题库、中性评分、规则总评），任何 LLM 失败不阻塞流程；评估明细 JSON 结构 `{scores:{logic,completeness,professionalism}, overall, strengths, weaknesses, suggestions, source}`；E2E 脚本 `backend/test_interview_api.py`。
 
 ## 6. 下一步建议
 
-1. 合并 PR #7 到 main（CI 已本地验证 vue-tsc 0 错误）
-2. 下一阶段按需求文档继续（M5/M6，面试模拟 interview 路由已有雏形 `app/api/v1/interview.py`）
+1. 推送 `feature-m5-interview` 并开 PR → 合并到 main（已本地验证 vue-tsc 0 错误 + E2E/浏览器全流程）
+2. 课程交付项收尾（需求 11/13）：12 张核心表 ER 图（表已齐）、Docker Compose 一键部署（frontend/backend/postgres/redis/agent-service）、测试材料整理（业务/RAG/Agent + test_interview_api.py）
 3. 新会话开工提示词模板：
 
 ```
