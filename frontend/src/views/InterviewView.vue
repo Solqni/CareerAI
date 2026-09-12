@@ -43,6 +43,14 @@ const features = [
 const currentQA = computed(
   () => session.value?.qas.find(q => q.answer === null) ?? null
 )
+// 对话式逐题揭晓：只显示到当前待答题，答完后下一题才出现
+const visibleQAs = computed(() => {
+  const qas = session.value?.qas ?? []
+  if (!qas.length) return []
+  const pendingIdx = qas.findIndex(q => q.answer === null)
+  if (pendingIdx === -1) return qas
+  return qas.slice(0, pendingIdx + 1)
+})
 const answeredCount = computed(
   () => session.value?.qas.filter(q => q.answer !== null).length ?? 0
 )
@@ -293,7 +301,7 @@ function backToSetup() {
             </div>
           </div>
 
-          <template v-for="(qa, idx) in session.qas" :key="qa.id">
+          <template v-for="(qa, idx) in visibleQAs" :key="qa.id">
             <!-- 问题 -->
             <div class="bubble-row ai">
               <div class="bubble">
