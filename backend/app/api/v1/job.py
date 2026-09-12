@@ -141,8 +141,8 @@ async def get_job(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """岗位知识库：查看单条岗位分析详情。"""
-    return await _get_job_or_404(job_id, current_user, db)
+    """岗位知识库：查看单条岗位分析详情（自有或平台共享）。"""
+    return await _get_job_or_404(job_id, current_user, db, allow_shared=True)
 
 
 @router.delete("/{job_id}", status_code=204)
@@ -158,11 +158,25 @@ async def delete_job(
 
 
 async def _get_job_or_404(
-    job_id: int, current_user: User, db: AsyncSession
+    job_id: int,
+    current_user: User,
+    db: AsyncSession,
+    allow_shared: bool = False,
 ) -> JobAnalysis:
+    """按 id 取岗位，仅限自有岗位；allow_shared 时放行平台共享岗位（只读场景）。"""
+    conditions = [JobAnalysis.id == job_id]
+    if allow_shared:
+        conditions.append(
+            or_(
+                JobAnalysis.user_id == current_user.id,
+                JobAnalysis.is_shared.is_(True),
+            )
+        )
+    else:
+        conditions.append(JobAnalysis.user_id == current_user.id)
     job = await db.scalar(
         select(JobAnalysis)
-        .where(JobAnalysis.id == job_id, JobAnalysis.user_id == current_user.id)
+        .where(*conditions)
         .options(selectinload(JobAnalysis.requirements))
     )
     if not job:

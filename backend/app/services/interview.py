@@ -18,7 +18,7 @@ import logging
 import re
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -194,11 +194,16 @@ async def create_session(
     resume_id: int | None = None,
     question_count: int = 6,
 ) -> dict:
-    """创建模拟面试会话：生成题库并落 interview_qa（UC：模拟面试入口）。"""
+    """创建模拟面试会话：生成题库并落 interview_qa（岗位可访问：自有或平台共享）。"""
     job = await db.scalar(
         select(JobAnalysis)
         .where(JobAnalysis.id == job_id)
-        .where(JobAnalysis.user_id == user_id)
+        .where(
+            or_(
+                JobAnalysis.user_id == user_id,
+                JobAnalysis.is_shared.is_(True),
+            )
+        )
     )
     if not job:
         raise ValueError("岗位不存在或无权访问")
