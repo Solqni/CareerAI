@@ -3,6 +3,12 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import BackButton from '@/components/BackButton.vue'
 import { useResumeStore } from '@/stores/resume'
+import {
+  deleteResume,
+  getResumes,
+  updateResumeProfile,
+  type ResumeListItem
+} from '@/api/resume'
 
 const router = useRouter()
 const resumeStore = useResumeStore()
@@ -10,6 +16,7 @@ const resumeStore = useResumeStore()
 const resumeText = ref('')
 const loading = ref(false)
 const errorMsg = ref('')
+const successMsg = ref('')
 const result = ref<any>(null)
 const fileName = ref('')
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -97,20 +104,67 @@ async function handleUpload(file: File) {
 const proficiencyLabel = (p: number) => ['初学', '了解', '熟悉', '熟练', '精通'][Math.min(p - 1, 4)] || '熟悉'
 const typeLabel = (t: string) => ({ work: '工作经历', internship: '实习经历', project: '项目经历' }[t] || t)
 
-// 处理更新信息
+// 处理更新信息：保存编辑的基本信息到最新简历（PUT /resume/profile）
 async function handleUpdate() {
+  if (!result.value) return
   loading.value = true
   errorMsg.value = ''
+  successMsg.value = ''
   try {
-    // TODO: 实现更新简历信息的API调用
-    // 暂时只是退出编辑模式
+    await updateResumeProfile({
+      name: result.value.name || undefined,
+      email: result.value.email || undefined,
+      phone: result.value.phone || undefined,
+      summary: result.value.summary || undefined,
+    })
+    await resumeStore.fetchProfile()
+    result.value = buildResult()
     editing.value = false
-    // 这里应该调用API更新数据，然后刷新数据
+    successMsg.value = '简历信息已保存'
+    setTimeout(() => { successMsg.value = '' }, 3000)
   } catch (e: any) {
     errorMsg.value = e.response?.data?.detail || e.message || '更新失败'
   } finally {
     loading.value = false
   }
+}
+
+// 我的简历：历史列表管理（删除错传/过期简历，避免脏数据堆积）
+const resumeList = ref<ResumeListItem[]>([])
+const listLoading = ref(false)
+const deletingId = ref<number | null>(null)
+
+async function fetchResumeList() {
+  listLoading.value = true
+  try {
+    resumeList.value = await getResumes()
+  } catch (err: any) {
+    console.error('获取简历列表失败:', err)
+  } finally {
+    listLoading.value = false
+  }
+}
+
+async function handleDeleteResume(item: ResumeListItem) {
+  if (deletingId.value) return
+  if (!window.confirm(`确定删除简历「${item.name || '未命名'}」吗？该操作不可恢复。`)) return
+  deletingId.value = item.id
+  try {
+    await deleteResume(item.id)
+    await fetchResumeList()
+    // 若删除的是最新简历，刷新画像展示
+    await resumeStore.fetchProfile()
+    result.value = buildResult()
+  } catch (e: any) {
+    errorMsg.value = e.response?.data?.detail || '删除失败'
+    console.error('删除简历失败:', e)
+  } finally {
+    deletingId.value = null
+  }
+}
+
+function fmtDate(d: string) {
+  return new Date(d).toLocaleString('zh-CN', { hour12: false })
 }
 
 // 初始化时获取已保存的简历数据
@@ -121,6 +175,7 @@ onMounted(async () => {
   } catch (err) {
     console.error('获取简历信息失败:', err)
   }
+  fetchResumeList()
 })
 </script>
 
@@ -217,6 +272,12 @@ onMounted(async () => {
     <div v-if="errorMsg" class="error-msg anim-fade-up">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
       {{ errorMsg }}
+    </div>
+
+    <!-- 成功提示 -->
+    <div v-if="successMsg" class="success-msg anim-fade-up">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      {{ successMsg }}
     </div>
 
     <!-- 解析结果 -->
@@ -388,6 +449,34 @@ onMounted(async () => {
         </div>
       </div>
     </div>
+
+    <!-- 我的简历：历史列表管理 -->
+    <div class="result-card anim-fade-up">
+      <div class="result-header">
+        <h3>我的简历</h3>
+      </div>
+      <div v-if="listLoading" class="study-empty">加载中...</div>
+      <div v-else-if="!resumeList.length" class="study-empty">暂无历史简历，上传或粘贴解析后会在此列出</div>
+      <ul v-else class="resume-list">
+        <li v-for="(item, idx) in resumeList" :key="item.id" class="resume-item">
+          <div class="resume-item-info">
+            <strong>{{ item.name || '未命名简历' }}</strong>
+            <small>{{ fmtDate(item.created_at) }}</small>
+          </div>
+          <div class="resume-item-actions">
+            <span v-if="idx === 0" class="resume-badge">最新</span>
+            <button
+              class="resume-delete"
+              :disabled="deletingId === item.id"
+              @click="handleDeleteResume(item)"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              {{ deletingId === item.id ? '删除中...' : '删除' }}
+            </button>
+          </div>
+        </li>
+      </ul>
+    </div>
     </div>
   </div>
 </template>
@@ -530,6 +619,46 @@ onMounted(async () => {
   font-size: 0.9rem;
 }
 .error-msg svg { width: 18px; height: 18px; flex-shrink: 0; }
+
+/* 成功提示 */
+.success-msg {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 1rem 1.2rem;
+  margin-top: 1.2rem;
+  background: #f0fff4;
+  border: 1px solid #c6f6d5;
+  border-radius: 12px;
+  color: #2f855a;
+  font-size: 0.9rem;
+}
+.success-msg svg { width: 18px; height: 18px; flex-shrink: 0; }
+
+/* 我的简历列表 */
+.study-empty { color: #a0aec0; font-size: 0.9rem; text-align: center; padding: 1.2rem 0; }
+.resume-list { list-style: none; margin: 0; padding: 0; }
+.resume-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.9rem 0.2rem;
+  border-bottom: 1px solid #edf2f7;
+}
+.resume-item:last-child { border-bottom: none; }
+.resume-item-info { display: flex; flex-direction: column; gap: 0.2rem; }
+.resume-item-info strong { color: #1a202c; font-size: 0.95rem; }
+.resume-item-info small { color: #a0aec0; font-size: 0.8rem; }
+.resume-item-actions { display: flex; align-items: center; gap: 0.7rem; }
+.resume-badge {
+  font-size: 0.75rem; color: #4c51bf; background: #ebf4ff;
+  border: 1px solid #c3dafe; border-radius: 999px; padding: 0.1rem 0.6rem;
+}
+.resume-delete {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  background: none; border: 1px solid #fed7d7; border-radius: 8px;
+  color: #e53e3e; font-size: 0.82rem; padding: 0.35rem 0.7rem; cursor: pointer;
+  transition: all 0.2s;
+}
+.resume-delete svg { width: 14px; height: 14px; }
+.resume-delete:hover:not(:disabled) { background: #fff5f5; }
+.resume-delete:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* 解析结果 */
 .result-card {

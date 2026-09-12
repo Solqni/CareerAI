@@ -1,11 +1,12 @@
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from sqlalchemy import delete, select
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
-from app.models import Resume, User, UserExperience, UserSkill
+from app.models import InterviewSession, Resume, User, UserExperience, UserSkill
 from app.schemas.resume import (
     ProfileOut,
+    ProfileUpdate,
     ResumeListItem,
     ResumeOut,
     ResumeParseRequest,
@@ -196,21 +197,21 @@ async def delete_skill(
     await db.commit()
 
 
-@router.get("/profile", response_model=ProfileOut)
-async def get_profile(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """能力画像：最新简历解析结果 + 技能表合并。"""
-    skills = (await db.scalars(
-        select(UserSkill).where(UserSkill.user_id == current_user.id).order_by(UserSkill.id)
-    )).all()
-    resume = await db.scalar(
+async def _get_latest_resume(db: AsyncSession, user_id: int) -> Resume | None:
+    return await db.scalar(
         select(Resume)
-        .where(Resume.user_id == current_user.id)
+        .where(Resume.user_id == user_id)
         .order_by(Resume.id.desc())
         .limit(1)
     )
+
+
+async def _build_profile(current_user: User, db: AsyncSession) -> ProfileOut:
+    """能力画像构建：最新简历解析结果 + 技能表合并（GET /profile 与更新后复用）。"""
+    skills = (await db.scalars(
+        select(UserSkill).where(UserSkill.user_id == current_user.id).order_by(UserSkill.id)
+    )).all()
+    resume = await _get_latest_resume(db, current_user.id)
     parsed = resume.parsed_json if resume else None
 
     # LLM 解析的 education 是 list[dict]（学校/学历/专业），这里拼成字符串以匹配 ProfileOut.education: str
@@ -249,3 +250,59 @@ async def get_profile(
         summary=(parsed or {}).get("summary") or "暂无简历数据，请先上传或解析简历",
         parsed_json=parsed,
     )
+
+
+@router.get("/profile", response_model=ProfileOut)
+async def get_profile(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """能力画像：最新简历解析结果 + 技能表合并。"""
+    return await _build_profile(current_user, db)
+
+
+@router.put("/profile", response_model=ProfileOut)
+async def update_profile(
+    payload: ProfileUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """更新最新简历的基本信息（姓名/邮箱/电话/个人概述），写入 parsed_json。"""
+    resume = await _get_latest_resume(db, current_user.id)
+    if not resume:
+        raise HTTPException(status_code=404, detail="暂无简历记录，请先上传或解析简历")
+
+    parsed = dict(resume.parsed_json or {})
+    for key in ("name", "email", "phone", "summary"):
+        value = getattr(payload, key)
+        if value is not None:
+            parsed[key] = value
+    resume.parsed_json = parsed
+    await db.commit()
+    await db.refresh(resume)
+    return await _build_profile(current_user, db)
+
+
+@router.delete("/{resume_id}", status_code=204)
+async def delete_resume(
+    resume_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """删除本人指定简历；关联的面试会话仅解除引用（resume_id 置空），会话保留。"""
+    resume = await db.scalar(
+        select(Resume)
+        .where(Resume.id == resume_id)
+        .where(Resume.user_id == current_user.id)
+    )
+    if not resume:
+        raise HTTPException(status_code=404, detail="简历不存在")
+    # 先解除面试会话引用，避免外键约束冲突
+    await db.execute(
+        update(InterviewSession)
+        .where(InterviewSession.resume_id == resume_id)
+        .values(resume_id=None)
+    )
+    await db.delete(resume)
+    await db.commit()
+    return Response(status_code=204)
