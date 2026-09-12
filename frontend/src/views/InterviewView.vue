@@ -35,17 +35,6 @@ const finishing = ref(false)
 const chatBody = ref<HTMLElement | null>(null)
 const chatInput = ref<HTMLInputElement | null>(null)
 
-// 每当新问题出现时，自动聚焦底部输入条
-watch(
-  () => [session.value?.id, currentQA.value?.id],
-  async ([, curId]) => {
-    if (curId) {
-      await nextTick()
-      chatInput.value?.focus()
-    }
-  }
-)
-
 const features = [
   { title: '技术题', desc: '岗位相关技术考察', color: '#667eea' },
   { title: '项目题', desc: '深挖简历项目细节', color: '#764ba2' },
@@ -74,6 +63,17 @@ const averageScore = computed(() => {
   return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
 })
 const isFinished = computed(() => session.value?.status === 'finished')
+
+// 每当新问题出现时，自动聚焦底部输入条
+watch(
+  () => [session.value?.id, currentQA.value?.id],
+  async ([, curId]) => {
+    if (curId) {
+      await nextTick()
+      chatInput.value?.focus()
+    }
+  }
+)
 
 function jobTitle(job: any) {
   return job?.parsed_json?.position_title || job?.position_title || `岗位 #${job?.id}`
