@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import BackButton from '@/components/BackButton.vue'
 import { useJobStore } from '@/stores/job'
@@ -33,6 +33,18 @@ const answerText = ref('')
 const submitting = ref(false)
 const finishing = ref(false)
 const chatBody = ref<HTMLElement | null>(null)
+const chatInput = ref<HTMLInputElement | null>(null)
+
+// 每当新问题出现时，自动聚焦底部输入条
+watch(
+  () => [session.value?.id, currentQA.value?.id],
+  async ([, curId]) => {
+    if (curId) {
+      await nextTick()
+      chatInput.value?.focus()
+    }
+  }
+)
 
 const features = [
   { title: '技术题', desc: '岗位相关技术考察', color: '#667eea' },
@@ -346,26 +358,14 @@ function backToSetup() {
                 <div class="feedback-point tip"><strong>改进建议</strong>{{ qa.feedback_json.suggestions }}</div>
               </div>
             </template>
-
-            <!-- 当前待答题：输入区 -->
-            <div v-else-if="currentQA && currentQA.id === qa.id && !isFinished" class="answer-box">
-              <textarea
-                v-model="answerText"
-                rows="4"
-                placeholder="结合你的项目与技术经历作答，建议 100 字以上…"
-                :disabled="submitting"
-              ></textarea>
-              <button class="btn-send" :disabled="submitting || !answerText.trim()" @click="sendAnswer">
-                {{ submitting ? 'AI 正在评估你的回答…' : '提交回答' }}
-              </button>
-            </div>
           </template>
 
-          <!-- 全部答完：生成总评 -->
-          <div v-if="!currentQA && !isFinished" class="finish-box">
-            <button class="btn" :disabled="finishing" @click="finish">
-              {{ finishing ? 'AI 正在生成总评报告…' : '全部题目已完成，生成面试总评报告' }}
-            </button>
+          <!-- 评估中：AI 打字气泡 -->
+          <div v-if="submitting" class="bubble-row ai">
+            <div class="bubble typing">
+              <span class="who">AI 面试官</span>
+              正在评估你的回答<i></i><i></i><i></i>
+            </div>
           </div>
 
           <!-- 总评报告 -->
@@ -381,6 +381,31 @@ function backToSetup() {
             </div>
             <p class="report-summary">{{ session.summary }}</p>
           </div>
+        </div>
+
+        <!-- 聊天式底部输入条 -->
+        <div class="chat-inputbar">
+          <template v-if="isFinished">
+            <div class="chat-ended">本场面试已结束，可开始一场新的模拟面试</div>
+          </template>
+          <template v-else-if="currentQA">
+            <input
+              ref="chatInput"
+              v-model="answerText"
+              :disabled="submitting"
+              placeholder="输入你的回答，回车发送…"
+              maxlength="2000"
+              @keyup.enter="sendAnswer"
+            />
+            <button class="btn-send" :disabled="submitting || !answerText.trim()" @click="sendAnswer">
+              发送
+            </button>
+          </template>
+          <template v-else>
+            <button class="btn-finish" :disabled="finishing" @click="finish">
+              {{ finishing ? 'AI 正在生成总评报告…' : '全部题目已完成，生成面试总评报告' }}
+            </button>
+          </template>
         </div>
       </div>
 
@@ -531,6 +556,9 @@ function backToSetup() {
 
 /* 对话窗口 */
 .chat-window {
+  display: flex;
+  flex-direction: column;
+  height: 72vh;
   border-radius: 16px;
   overflow: hidden;
   box-shadow: 0 10px 36px rgba(0,0,0,0.1);
@@ -549,11 +577,11 @@ function backToSetup() {
 .dot.green { background: #68d391; }
 .chat-title { margin-left: 0.6rem; color: #a0aec0; font-size: 0.8rem; }
 .chat-body {
+  flex: 1;
+  overflow-y: auto;
   background: rgba(247,250,252,0.6);
   backdrop-filter: blur(10px);
   padding: 1.3rem;
-  max-height: 65vh;
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 0.8rem;
@@ -607,28 +635,29 @@ function backToSetup() {
 .feedback-point.bad strong { color: #742a2a; }
 .feedback-point.tip strong { color: #553c9a; }
 
-/* 作答区 */
-.answer-box {
-  align-self: flex-end;
-  width: 82%;
-  display: flex; flex-direction: column; gap: 0.6rem;
+/* 聊天式底部输入条 */
+.chat-inputbar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.8rem 1rem;
+  border-top: 1px solid #e2e8f0;
+  background: rgba(255,255,255,0.92);
 }
-.answer-box textarea {
-  width: 100%;
-  padding: 0.8rem 0.9rem;
+.chat-inputbar input {
+  flex: 1;
+  padding: 0.65rem 1.1rem;
   border: 1px solid #cbd5e0;
-  border-radius: 12px;
-  font-size: 0.88rem;
-  line-height: 1.6;
-  resize: vertical;
-  font-family: inherit;
+  border-radius: 999px;
+  font-size: 0.9rem;
   outline: none;
   background: #fff;
+  color: #2d3748;
 }
-.answer-box textarea:focus { border-color: #4facfe; box-shadow: 0 0 0 3px rgba(79,172,254,0.15); }
+.chat-inputbar input:focus { border-color: #4facfe; box-shadow: 0 0 0 3px rgba(79,172,254,0.15); }
+.chat-inputbar input:disabled { background: #edf2f7; cursor: not-allowed; }
 .btn-send {
-  align-self: flex-end;
-  padding: 0.6rem 1.6rem;
+  padding: 0.6rem 1.4rem;
   background: linear-gradient(135deg, #667eea, #764ba2);
   color: #fff;
   border: none;
@@ -637,12 +666,43 @@ function backToSetup() {
   font-size: 0.88rem;
   cursor: pointer;
   transition: transform 0.2s ease;
+  flex-shrink: 0;
 }
 .btn-send:hover:not(:disabled) { transform: translateY(-2px); }
 .btn-send:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-finish {
+  width: 100%;
+  padding: 0.7rem 1.5rem;
+  background: linear-gradient(135deg, #43e97b, #4facfe);
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.92rem;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(102,126,234,0.3);
+  transition: transform 0.2s ease;
+}
+.btn-finish:hover:not(:disabled) { transform: translateY(-2px); }
+.btn-finish:disabled { opacity: 0.6; cursor: not-allowed; }
+.chat-ended { width: 100%; text-align: center; color: #a0aec0; font-size: 0.85rem; }
 
-.finish-box { align-self: center; width: 100%; margin-top: 0.4rem; }
-.finish-box .btn { box-shadow: 0 8px 24px rgba(102,126,234,0.3); }
+/* 评估中打字气泡 */
+.bubble.typing { color: #718096; }
+.bubble.typing i {
+  display: inline-block;
+  width: 5px; height: 5px;
+  margin-left: 4px;
+  background: #a0aec0;
+  border-radius: 50%;
+  animation: dotBlink 1.2s infinite;
+}
+.bubble.typing i:nth-child(2) { animation-delay: 0.2s; }
+.bubble.typing i:nth-child(3) { animation-delay: 0.4s; }
+@keyframes dotBlink {
+  0%, 60%, 100% { opacity: 0.25; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-2px); }
+}
 
 /* 总评报告 */
 .report-card {
@@ -665,6 +725,7 @@ function backToSetup() {
 @media (max-width: 640px) {
   .tips { grid-template-columns: 1fr; }
   .form-row { grid-template-columns: 1fr; }
-  .bubble, .feedback-card, .answer-box { max-width: 100%; width: 100%; }
+  .bubble, .feedback-card { max-width: 100%; }
+  .chat-window { height: 78vh; }
 }
 </style>
