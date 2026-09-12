@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { parseJobDescription, parseJobImage, getJobs, createJob, deleteJob as deleteJobApi, type Job } from '@/api/job'
+import { parseJobDescription, parseJobImage, getJobs, deleteJob as deleteJobApi, type Job } from '@/api/job'
 
 export const useJobStore = defineStore('job', () => {
   const jobs = ref<Job[]>([])
@@ -28,13 +28,13 @@ export const useJobStore = defineStore('job', () => {
       error.value = ''
       const result = await parseJobDescription(jdText)
 
-      // 保存当前解析的岗位
+      // 保存当前解析的岗位（后端 /parse 已自动入库，取真实 id）
       currentJob.value = {
-        id: Date.now(),
+        id: result.data.id ?? Date.now(),
         title: result.data.parsed_json.position_title || '未命名岗位',
         jd_text: jdText,
         parsed_json: result.data.parsed_json,
-        created_at: new Date().toISOString()
+        created_at: result.data.created_at || new Date().toISOString()
       }
 
       return result
@@ -70,31 +70,6 @@ export const useJobStore = defineStore('job', () => {
     }
   }
 
-  // 保存岗位分析结果
-  async function saveJob(jobData: Partial<Job>) {
-    try {
-      loading.value = true
-      error.value = ''
-
-      if (currentJob.value) {
-        // 更新现有岗位
-        Object.assign(currentJob.value, jobData)
-      } else {
-        // 创建新岗位
-        const newJob = await createJob(jobData)
-        jobs.value.unshift(newJob)
-        currentJob.value = newJob
-      }
-
-      return currentJob.value
-    } catch (err: any) {
-      error.value = err.response?.data?.detail || '保存失败'
-      throw err
-    } finally {
-      loading.value = false
-    }
-  }
-
   // 删除岗位（真实调用后端，级联清理报告链）
   async function deleteJob(jobId: number) {
     try {
@@ -121,7 +96,6 @@ export const useJobStore = defineStore('job', () => {
     fetchJobs,
     parseJob,
     parseImageJob,
-    saveJob,
     deleteJob
   }
 })

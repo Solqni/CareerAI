@@ -26,12 +26,8 @@ export function parseJobImage(file: File) {
   })
 }
 
-export function getJobs(): Promise<Job[]> {
+export function getJobs() {
   return api.get('/jobs').then(r => r.data)
-}
-
-export function createJob(data: Partial<Job>): Promise<Job> {
-  return api.post('/jobs', data).then(r => r.data)
 }
 
 export function getJob(jobId: number) {

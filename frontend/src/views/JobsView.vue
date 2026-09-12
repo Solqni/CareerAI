@@ -139,20 +139,6 @@ function clearImage() {
   imagePreview.value = ''
   if (imageInput.value) imageInput.value.value = ''
 }
-
-// 保存岗位分析
-async function handleSave() {
-  try {
-    await jobStore.saveJob({
-      jd_text: jdText.value,
-      parsed_json: result.value
-    })
-    alert('岗位分析已保存')
-    editing.value = false
-  } catch (e: any) {
-    alert(e.response?.data?.detail || '保存失败')
-  }
-}
 </script>
 
 <template>
@@ -232,14 +218,7 @@ async function handleSave() {
     <div v-if="result" class="result-card anim-fade-up">
       <div class="result-header">
         <h3>岗位分析结果</h3>
-        <button v-if="!editing" class="save-btn" @click="handleSave">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-            <polyline points="17 21 17 13 7 13 7 21"></polyline>
-            <polyline points="7 3 7 8 15 8"></polyline>
-          </svg>
-          保存分析
-        </button>
+        <span class="save-note">解析完成已自动保存到我的岗位</span>
       </div>
 
       <!-- 岗位名称 -->
@@ -718,20 +697,5 @@ async function handleSave() {
   border-bottom: 1px solid #edf2f7;
 }
 .result-header h3 { font-size: 1.2rem; color: #1a202c; }
-.save-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.5rem 1rem;
-  background: linear-gradient(135deg, #43e97b, #38b2ac);
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  font-size: 0.85rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-.save-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(67,233,123,0.3); }
-.save-btn svg { width: 16px; height: 16px; }
+.save-note { font-size: 0.78rem; color: #38a169; background: #f0fff4; border: 1px solid #c6f6d5; border-radius: 999px; padding: 0.2rem 0.7rem; }
 </style>

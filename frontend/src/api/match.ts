@@ -191,8 +191,3 @@ export function submitTaskAnswer(
 export function getLearningProgress(): Promise<LearningProgress> {
   return api.get<LearningProgress>('/match/progress').then(r => r.data)
 }
-
-// 创建匹配（保留旧接口）
-export function createMatch(data: { job_id: string; resume_data: any }) {
-  return api.post('/match/create', data)
-}
