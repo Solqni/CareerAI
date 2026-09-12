@@ -82,6 +82,8 @@ class LearningTask(Base):
     task_name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     resource_url = Column(String(512), nullable=True)
+    priority = Column(String(16), default="medium")  # high / medium / low
+    estimated_days = Column(Integer, nullable=True)  # 预估时长（天）
     status = Column(String(32), default="todo")
     due_date = Column(String(32), nullable=True)
 

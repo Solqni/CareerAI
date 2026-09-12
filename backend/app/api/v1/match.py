@@ -4,11 +4,86 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_user, get_db
-from app.models import User, Resume, JobAnalysis, MatchReport
-from app.schemas.match import MatchCreate, MatchOut, MatchListItem
+from app.models import JobAnalysis, LearningPlan, MatchReport, Resume, User
+from app.schemas.match import (
+    LearningPlanOut,
+    LearningTaskOut,
+    MatchCreate,
+    MatchOut,
+    TaskStatusUpdate,
+)
 from app.services.match_analysis import calculate_match_report
+from app.services.matching import (
+    generate_and_persist_plan,
+    get_plan_by_report,
+    update_task_status,
+)
 
 router = APIRouter(prefix="/match", tags=["match"])
+
+# 报告完整预加载：差距 + 建议 + 学习计划（含任务），避免 commit 后懒加载 MissingGreenlet
+_REPORT_LOAD = (
+    selectinload(MatchReport.gaps),
+    selectinload(MatchReport.recommendations),
+    selectinload(MatchReport.learning_plan).selectinload(LearningPlan.tasks),
+)
+
+
+async def _run_full_match(
+    payload: MatchCreate, current_user: User, db: AsyncSession
+) -> MatchReport:
+    """完整匹配流程（需求 3.3 UC-008~011）：
+
+    1. 校验简历与岗位归属（UC-008 前置）
+    2. skill_matcher 规则计算匹配度与差距（UC-008/009，分维度可解释）
+    3. 持久化 match_report + gap_item + recommendation
+    4. LLM 生成学习计划并持久化 learning_plan + learning_task（UC-011）
+    """
+    resume = await db.scalar(
+        select(Resume)
+        .where(Resume.id == payload.resume_id)
+        .where(Resume.user_id == current_user.id)
+    )
+    if not resume:
+        raise HTTPException(status_code=404, detail="简历不存在")
+
+    job = await db.scalar(
+        select(JobAnalysis)
+        .where(JobAnalysis.id == payload.job_id)
+        .where(JobAnalysis.user_id == current_user.id)
+    )
+    if not job:
+        raise HTTPException(status_code=404, detail="岗位不存在")
+
+    # 1-3. 匹配计算 + 报告/差距/建议 ORM 构造
+    report = await calculate_match_report(resume, job, db)
+    db.add(report)
+    await db.flush()  # 先取 report.id，供 learning_plan 关联
+
+    # 4. 学习计划生成（LLM，失败自动降级为规则生成；异常时回滚计划仅保留报告）
+    try:
+        await generate_and_persist_plan(report, db)
+    except Exception:
+        await db.rollback()
+        db.add(report)
+
+    # 单次事务提交：报告 + 差距 + 建议 + 学习计划
+    await db.commit()
+
+    # commit 后关系过期，重查（项目约定）
+    return await db.scalar(
+        select(MatchReport).where(MatchReport.id == report.id).options(*_REPORT_LOAD)
+    )
+
+
+@router.post("", response_model=MatchOut)
+async def create_match(
+    payload: MatchCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """触发完整匹配流程：匹配度计算 → 差距识别 → 学习计划生成，返回匹配报告。"""
+    return await _run_full_match(payload, current_user, db)
 
 
 @router.post("/analyze", response_model=MatchOut)
@@ -17,41 +92,8 @@ async def analyze_match(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """分析简历与岗位的匹配度"""
-    # 验证简历是否存在
-    resume_result = await db.scalar(
-        select(Resume)
-        .where(Resume.id == payload.resume_id)
-        .where(Resume.user_id == current_user.id)
-    )
-    if not resume_result:
-        raise HTTPException(status_code=404, detail="简历不存在")
-
-    # 验证岗位是否存在
-    job_result = await db.scalar(
-        select(JobAnalysis)
-        .where(JobAnalysis.id == payload.job_id)
-        .where(JobAnalysis.user_id == current_user.id)
-    )
-    if not job_result:
-        raise HTTPException(status_code=404, detail="岗位不存在")
-
-    # 计算匹配度
-    match_report = await calculate_match_report(resume_result, job_result, db)
-
-    # 保存匹配结果，commit 后重查（带关系预加载，避免懒加载 MissingGreenlet）
-    db.add(match_report)
-    await db.commit()
-
-    match_report = await db.scalar(
-        select(MatchReport)
-        .where(MatchReport.id == match_report.id)
-        .options(
-            selectinload(MatchReport.gaps),
-            selectinload(MatchReport.recommendations),
-        )
-    )
-    return match_report
+    """分析简历与岗位的匹配度（与 POST /match 等价，兼容前端既有调用）。"""
+    return await _run_full_match(payload, current_user, db)
 
 
 @router.get("/")
@@ -75,16 +117,40 @@ async def get_match_detail(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """获取匹配详情"""
+    """获取匹配详情（含差距、建议与学习计划）"""
     result = await db.scalar(
         select(MatchReport)
         .where(MatchReport.id == match_id)
         .where(MatchReport.user_id == current_user.id)
-        .options(
-            selectinload(MatchReport.gaps),
-            selectinload(MatchReport.recommendations),
-        )
+        .options(*_REPORT_LOAD)
     )
     if not result:
         raise HTTPException(status_code=404, detail="匹配报告不存在")
     return result
+
+
+@router.get("/{match_id}/plan", response_model=LearningPlanOut)
+async def get_match_plan(
+    match_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """获取匹配报告对应的学习计划与任务列表（UC-011/UC-012）"""
+    plan = await get_plan_by_report(match_id, current_user.id, db)
+    if not plan:
+        raise HTTPException(status_code=404, detail="该报告暂无学习计划")
+    return plan
+
+
+@router.patch("/plan/tasks/{task_id}", response_model=LearningTaskOut)
+async def update_learning_task(
+    task_id: int,
+    payload: TaskStatusUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """更新学习任务状态：todo（待开始）/ in_progress（进行中）/ done（已完成）（UC-012）"""
+    task = await update_task_status(task_id, current_user.id, payload.status.value, db)
+    if not task:
+        raise HTTPException(status_code=404, detail="学习任务不存在")
+    return task
