@@ -11,6 +11,7 @@ import json
 import re
 from datetime import date, timedelta
 
+from langchain_core.messages import HumanMessage, SystemMessage
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -217,3 +218,249 @@ async def update_task_status(
     await db.commit()
     await db.refresh(task)
     return task
+
+
+_STUDY_SYSTEM_PROMPT = (
+    "你是学习教练。根据学习任务与知识库片段为用户生成练习题，必须输出 JSON，"
+    '格式：{"questions": [{"question": "...", "reference_answer": "..."}]}。要求：\n'
+    "1. 题目 3-5 道，紧扣任务涉及的知识点（优先结合知识库片段内容）；\n"
+    "2. 题型为简答/场景分析，能检验掌握程度，不要选择题；\n"
+    "3. reference_answer 简明准确，每题 2-4 句；\n"
+    "4. 仅输出 JSON，不要多余文字。"
+)
+
+_ANSWER_SYSTEM_PROMPT = (
+    "你是练习题批改教练。根据题目、参考答案与用户作答给出点评，必须输出 JSON，"
+    '格式：{"score": 0到100的整数, "feedback": "点评文字"}。要求：\n'
+    "1. 先肯定答对的部分，再指出遗漏或错误，最后给一句改进建议；\n"
+    "2. feedback 简明 2-4 句，语气温和鼓励；\n"
+    "3. 仅输出 JSON，不要多余文字。"
+)
+
+
+def _normalize_questions(raw: dict) -> list[dict]:
+    """校验并规整 LLM 返回的练习题列表。"""
+    questions = raw.get("questions") if isinstance(raw, dict) else None
+    if not isinstance(questions, list):
+        return []
+    result = []
+    for q in questions:
+        if not isinstance(q, dict) or not q.get("question"):
+            continue
+        result.append(
+            {
+                "question": str(q["question"]),
+                "reference_answer": str(q.get("reference_answer") or ""),
+            }
+        )
+    return result[:5]
+
+
+def _study_cache(task: LearningTask) -> dict:
+    """读取 study_json 缓存并补齐默认结构（兼容旧数据）。"""
+    cache = task.study_json if isinstance(task.study_json, dict) else {}
+    cache.setdefault("questions", [])
+    cache.setdefault("asked", [])
+    cache.setdefault("answers", {})
+    cache.setdefault("batch", 1)
+    cache.setdefault("total_generated", 0)
+    # 旧格式缓存没有累计字段，用当前批题数兜底
+    if cache["total_generated"] < len(cache["questions"]):
+        cache["total_generated"] = len(cache["questions"])
+    return cache
+
+
+async def _generate_questions(
+    task: LearningTask, knowledge: list[dict], avoid: list[str]
+) -> list[dict]:
+    """调用 LLM 生成一批练习题，avoid 中的题目不再重复出现。"""
+    context = "\n\n".join(
+        f"[片段{i + 1}]（来源：{k['doc_title']}）\n{k['content']}"
+        for i, k in enumerate(knowledge)
+    ) or "（无知识库片段，请基于通用知识出题）"
+    avoid_text = (
+        "\n\n出题时必须避开以下已出过的题目（考察角度也不要重复）：\n"
+        + "\n".join(f"- {q}" for q in avoid[-30:])
+        if avoid
+        else ""
+    )
+    llm = get_chat_llm()
+    resp = await llm.ainvoke(
+        [
+            SystemMessage(_STUDY_SYSTEM_PROMPT),
+            HumanMessage(
+                f"学习任务：{task.task_name}\n"
+                f"任务描述：{task.description or '（无）'}\n\n"
+                f"知识库片段：\n{context}{avoid_text}"
+            ),
+        ]
+    )
+    content = resp.content if isinstance(resp.content, str) else str(resp.content)
+    return _normalize_questions(_extract_json(content))
+
+
+def _study_result(task: LearningTask, knowledge: list[dict], cache: dict, source: str) -> dict:
+    """组装学习内容返回值（统一结构，供查询/换新题/答题后复用）。"""
+    return {
+        "task_id": task.id,
+        "task_name": task.task_name,
+        "knowledge": knowledge,
+        "questions": cache.get("questions", []),
+        "answers": cache.get("answers", {}),
+        "batch": cache.get("batch", 1),
+        "total_generated": cache.get("total_generated", 0),
+        "source": source,
+    }
+
+
+async def _load_task(task_id: int, user_id: int, db: AsyncSession) -> LearningTask | None:
+    return await db.scalar(
+        select(LearningTask)
+        .join(LearningPlan, LearningTask.plan_id == LearningPlan.id)
+        .where(LearningTask.id == task_id)
+        .where(LearningPlan.user_id == user_id)
+    )
+
+
+async def _retrieve_knowledge(task: LearningTask, db: AsyncSession) -> list[dict]:
+    """RAG 实时检索关联知识点（失败降级为空列表，不阻断）。"""
+    import logging
+
+    from app.services.rag import search_knowledge
+
+    try:
+        query = " ".join([task.task_name, task.description or ""]).strip()
+        if not query:
+            return []
+        hits = await search_knowledge(db, query, top_k=4)
+        return [
+            {
+                "doc_title": h["doc_title"],
+                "content": h["content"],
+                "similarity": h["similarity"],
+            }
+            for h in hits
+        ]
+    except Exception:
+        logging.getLogger(__name__).exception("学习内容知识库检索失败，返回空知识点")
+        return []
+
+
+async def get_task_study(task_id: int, user_id: int, db: AsyncSession) -> dict | None:
+    """学习任务的学习内容：RAG 实时检索关联知识点（管理员知识库）+ 当前一批练习题。
+
+    练习题由 LLM 生成并缓存到 task.study_json（questions 为当前批，asked 为历史全部，
+    answers 为作答记录）。再次查看直接复用缓存（source=cache）。
+    任务不存在或不属于该用户返回 None。
+    """
+    task = await _load_task(task_id, user_id, db)
+    if not task:
+        return None
+
+    knowledge = await _retrieve_knowledge(task, db)
+    cache = _study_cache(task)
+
+    # 首次查看且无缓存题目：生成第一批（此处不写缓存，写缓存统一由 refresh/首次生成路径处理）
+    if not cache["questions"]:
+        try:
+            questions = await _generate_questions(task, knowledge, cache["asked"])
+            if questions:
+                cache["questions"] = questions
+                cache["source"] = "llm"
+                cache["total_generated"] = int(cache["total_generated"]) + len(questions)
+                task.study_json = cache
+                await db.commit()
+        except Exception:
+            pass  # 生成失败降级为仅知识点，下次查看重试
+
+    return _study_result(task, knowledge, cache, cache.get("source", "rag_only"))
+
+
+async def refresh_task_study(task_id: int, user_id: int, db: AsyncSession) -> dict | None:
+    """换一批新题：当前批题目并入历史，LLM 生成一批不与历史重复的新题并清空作答记录。
+
+    LLM 失败抛 ValueError（旧缓存保留，不影响再次查看）。
+    """
+    task = await _load_task(task_id, user_id, db)
+    if not task:
+        return None
+
+    knowledge = await _retrieve_knowledge(task, db)
+    cache = _study_cache(task)
+
+    asked: list[str] = list(cache["asked"])
+    asked += [q["question"] for q in cache["questions"] if q.get("question")]
+
+    questions = await _generate_questions(task, knowledge, asked)
+    if not questions:
+        raise ValueError("新题目生成失败，请稍后重试")
+
+    cache["questions"] = questions
+    cache["asked"] = asked
+    cache["answers"] = {}
+    cache["source"] = "llm"
+    cache["batch"] = int(cache["batch"]) + 1
+    cache["total_generated"] = int(cache["total_generated"]) + len(questions)
+    task.study_json = cache
+    await db.commit()
+    return _study_result(task, knowledge, cache, "llm")
+
+
+async def answer_task_question(
+    task_id: int, user_id: int, db: AsyncSession, question: str, answer: str
+) -> dict | None:
+    """提交练习题作答：LLM 对比参考答案给出得分与点评，持久化到 study_json.answers。
+
+    任务不存在 / 题目不在当前批 / 作答为空返回 None；LLM 失败抛 ValueError。
+    """
+    task = await _load_task(task_id, user_id, db)
+    if not task:
+        return None
+    question = (question or "").strip()
+    answer = (answer or "").strip()
+    if not question or not answer:
+        return None
+
+    cache = _study_cache(task)
+    target = next(
+        (q for q in cache["questions"] if q.get("question") == question), None
+    )
+    if not target:
+        return None
+
+    from langchain_core.messages import HumanMessage, SystemMessage
+
+    llm = get_chat_llm()
+    resp = await llm.ainvoke(
+        [
+            SystemMessage(_ANSWER_SYSTEM_PROMPT),
+            HumanMessage(
+                f"题目：{question}\n\n"
+                f"参考答案：{target.get('reference_answer') or '（无）'}\n\n"
+                f"用户作答：{answer}"
+            ),
+        ]
+    )
+    content = resp.content if isinstance(resp.content, str) else str(resp.content)
+    raw = _extract_json(content)
+    try:
+        score = max(0, min(100, int(raw.get("score"))))
+    except (TypeError, ValueError):
+        score = None
+    feedback = str(raw.get("feedback") or "").strip()
+    if not feedback:
+        raise ValueError("点评生成失败，请稍后重试")
+
+    cache.setdefault("answers", {})[question] = {
+        "answer": answer,
+        "feedback": feedback,
+        "score": score,
+    }
+    task.study_json = cache
+    await db.commit()
+    return {
+        "question": question,
+        "answer": answer,
+        "feedback": feedback,
+        "score": score,
+    }

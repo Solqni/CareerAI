@@ -40,6 +40,9 @@ export interface MatchAnalysisResult {
   education_match: number
   overall_score: number
   summary?: string
+  company?: string | null
+  city?: string | null
+  detail_json?: { analysis_source?: string; rule_summary?: string } | null
   gaps: GapItem[]
   recommendations: Recommendation[]
   created_at: string
@@ -57,6 +60,53 @@ export interface MatchListItem {
   education_match: number
   created_at: string
   analyzed_at: string
+}
+
+// 学习任务学习内容（知识点来自管理员知识库检索，练习题首次生成后缓存）
+export interface StudyKnowledgeItem {
+  content: string
+  doc_title: string
+  similarity: number
+}
+
+export interface StudyQuestionItem {
+  question: string
+  reference_answer: string
+}
+
+export interface StudyAnswerFeedback {
+  answer: string
+  feedback: string
+  score?: number | null
+}
+
+export interface TaskStudy {
+  task_id: number
+  task_name: string
+  knowledge: StudyKnowledgeItem[]
+  questions: StudyQuestionItem[]
+  answers: Record<string, StudyAnswerFeedback>
+  batch: number
+  total_generated: number
+  source: 'cache' | 'llm' | 'rag_only'
+}
+
+// 仪表盘学习进度（用户最新一份学习计划的真实完成度）
+export interface ProgressTaskItem {
+  id: number
+  task_name: string
+  status: 'todo' | 'in_progress' | 'done'
+  priority: 'low' | 'medium' | 'high'
+}
+
+export interface LearningProgress {
+  has_plan: boolean
+  position_title?: string | null
+  total_tasks: number
+  done_tasks: number
+  in_progress_tasks: number
+  progress: number
+  tasks: ProgressTaskItem[]
 }
 
 // 学习任务接口
@@ -110,6 +160,32 @@ export function getMatchPlan(matchId: string): Promise<LearningPlan> {
 // 更新学习任务状态（todo: 待开始 / in_progress: 进行中 / done: 已完成）
 export function updateTaskStatus(taskId: number, status: LearningTask['status']): Promise<LearningTask> {
   return api.patch<LearningTask>(`/match/plan/tasks/${taskId}`, { status }).then(r => r.data)
+}
+
+// 获取学习任务的学习内容（关联知识点 + 当前一批练习题 + 作答记录）
+export function getTaskStudy(taskId: number): Promise<TaskStudy> {
+  return api.get<TaskStudy>(`/match/plan/tasks/${taskId}/study`).then(r => r.data)
+}
+
+// 换一批新题（旧题并入历史，新题不与历史重复，作答记录清空）
+export function refreshTaskStudy(taskId: number): Promise<TaskStudy> {
+  return api.post<TaskStudy>(`/match/plan/tasks/${taskId}/study/refresh`).then(r => r.data)
+}
+
+// 提交练习题作答，返回 AI 点评（得分 + 反馈）
+export function submitTaskAnswer(
+  taskId: number,
+  question: string,
+  answer: string
+): Promise<{ question: string; answer: string; feedback: string; score?: number | null }> {
+  return api
+    .post(`/match/plan/tasks/${taskId}/study/answer`, { question, answer })
+    .then(r => r.data)
+}
+
+// 获取仪表盘学习进度（最新学习计划的真实完成度）
+export function getLearningProgress(): Promise<LearningProgress> {
+  return api.get<LearningProgress>('/match/progress').then(r => r.data)
 }
 
 // 创建匹配（保留旧接口）

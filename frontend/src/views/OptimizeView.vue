@@ -109,6 +109,17 @@ function goMatch() {
             <p v-if="result.summary" class="summary">{{ result.summary }}</p>
           </div>
 
+          <!-- 知识库引用来源（管理员知识库） -->
+          <div v-if="result.knowledge_refs?.length" class="knowledge-refs">
+            <h4>知识库引用来源 <span class="ref-tag">来自管理员知识库</span></h4>
+            <div class="ref-list">
+              <div v-for="ref in result.knowledge_refs" :key="ref.doc_id" class="ref-item">
+                <span class="ref-title">{{ ref.doc_title }}</span>
+                <span class="ref-score">相关度 {{ Math.round(ref.similarity * 100) }}%</span>
+              </div>
+            </div>
+          </div>
+
           <div class="suggestion-list">
             <div
               v-for="(s, i) in result.suggestions"
@@ -213,6 +224,17 @@ h2 { font-size: 1.8rem; color: #1a202c; margin-bottom: 0.5rem; }
 .result-head h3 { font-size: 1.4rem; color: #1a202c; margin-bottom: 0.5rem; }
 .target { color: #7c3aed; font-weight: 700; }
 .summary { color: #4a5568; background: rgba(139,92,246,0.08); border-radius: 12px; padding: 1rem 1.2rem; line-height: 1.7; margin-bottom: 1.5rem; }
+
+.knowledge-refs {
+  background: rgba(6,182,212,0.06); border-left: 4px solid #06b6d4;
+  border-radius: 12px; padding: 1rem 1.2rem; margin-bottom: 1.5rem;
+}
+.knowledge-refs h4 { font-size: 0.95rem; color: #0e7490; margin-bottom: 0.6rem; display: flex; align-items: center; gap: 0.5rem; }
+.ref-tag { font-size: 0.72rem; font-weight: 600; color: #0e7490; background: rgba(6,182,212,0.12); border-radius: 999px; padding: 0.1rem 0.6rem; }
+.ref-list { display: flex; flex-direction: column; gap: 0.4rem; }
+.ref-item { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+.ref-title { color: #164e63; font-size: 0.88rem; }
+.ref-score { color: #0e7490; font-size: 0.8rem; white-space: nowrap; }
 
 .suggestion-list { display: flex; flex-direction: column; gap: 1rem; }
 .suggestion-item {

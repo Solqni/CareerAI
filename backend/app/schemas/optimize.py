@@ -32,6 +32,13 @@ class OptimizationSuggestion(BaseModel):
     example: Optional[str] = Field(None, description="示例改法（基于用户真实信息的改写示例）")
 
 
+class KnowledgeRef(BaseModel):
+    """知识库引用来源（来自平台管理员知识库）"""
+    doc_id: int = Field(..., description="知识文档ID")
+    doc_title: str = Field(..., description="知识文档标题")
+    similarity: float = Field(..., description="与岗位/差距的相似度")
+
+
 class OptimizeResponse(BaseModel):
     """简历优化结果"""
     job_id: int
@@ -39,3 +46,6 @@ class OptimizeResponse(BaseModel):
     resume_id: Optional[int] = None
     suggestions: List[OptimizationSuggestion] = Field(default_factory=list)
     summary: Optional[str] = Field(None, description="整体优化思路概述")
+    knowledge_refs: List[KnowledgeRef] = Field(
+        default_factory=list, description="RAG 检索引用的知识库来源"
+    )

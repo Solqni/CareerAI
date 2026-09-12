@@ -103,7 +103,7 @@ function handleLogout() {
         <!-- RAG 知识库 -->
         <div class="panel anim-fade-up anim-delay-4">
           <h3>RAG 知识库</h3>
-          <p class="panel-desc">构建和管理 RAG 知识库（阶段二功能）</p>
+          <p class="panel-desc">构建和管理 RAG 知识库</p>
           <button class="panel-btn" @click="router.push('/admin/rag')">
             管理知识库
           </button>

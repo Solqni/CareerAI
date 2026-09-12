@@ -11,6 +11,13 @@ export interface OptimizationSuggestion {
   example?: string
 }
 
+// 知识库引用来源（来自平台管理员知识库）
+export interface KnowledgeRef {
+  doc_id: number
+  doc_title: string
+  similarity: number
+}
+
 // 简历优化结果
 export interface OptimizeResponse {
   job_id: number
@@ -18,6 +25,7 @@ export interface OptimizeResponse {
   resume_id?: number
   suggestions: OptimizationSuggestion[]
   summary?: string
+  knowledge_refs?: KnowledgeRef[]
 }
 
 // 生成简历优化建议（M4：关键词优化/经历量化/内容增强/结构建议）

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 import logging
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -9,16 +9,22 @@ from app.api.deps import get_current_user, get_db
 from app.models import JobAnalysis, LearningPlan, MatchReport, Resume, User
 from app.schemas.match import (
     LearningPlanOut,
+    LearningProgressOut,
     LearningTaskOut,
     MatchCreate,
     MatchOut,
+    TaskAnswerIn,
     TaskStatusUpdate,
+    TaskStudyOut,
 )
 from app.services.match_analysis import calculate_match_report
 from app.services.matching import (
+    answer_task_question,
     generate_and_persist_plan,
     get_plan_by_report,
+    get_task_study,
     llm_match_analysis,
+    refresh_task_study,
     update_task_status,
 )
 
@@ -54,10 +60,18 @@ async def _run_full_match(
     job = await db.scalar(
         select(JobAnalysis)
         .where(JobAnalysis.id == payload.job_id)
-        .where(JobAnalysis.user_id == current_user.id)
+        .where(
+            or_(
+                JobAnalysis.user_id == current_user.id,
+                JobAnalysis.is_shared.is_(True),
+            )
+        )
     )
     if not job:
         raise HTTPException(status_code=404, detail="岗位不存在")
+
+    # commit 后 ORM 关系过期，此处暂存岗位公司/城市，供重查后挂载到报告上
+    job_parsed = job.parsed_json or {}
 
     # 1-3. 匹配计算 + 报告/差距/建议 ORM 构造
     report = await calculate_match_report(resume, job, db)
@@ -87,9 +101,14 @@ async def _run_full_match(
     await db.commit()
 
     # commit 后关系过期，重查（项目约定）
-    return await db.scalar(
+    result = await db.scalar(
         select(MatchReport).where(MatchReport.id == report.id).options(*_REPORT_LOAD)
     )
+    # 挂载岗位公司/城市与分析来源（表无这些列，供 Pydantic from_attributes 读取）
+    result.company = job_parsed.get("company")
+    result.city = job_parsed.get("city")
+    result.analysis_source = (result.detail_json or {}).get("analysis_source")
+    return result
 
 
 @router.post("", response_model=MatchOut)
@@ -127,6 +146,45 @@ async def list_matches(
     return {"user_id": current_user.id, "reports": result.scalars().all()}
 
 
+@router.get("/progress", response_model=LearningProgressOut)
+async def get_learning_progress(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """仪表盘学习进度：取当前用户最新一份学习计划的真实完成度与任务列表"""
+    plan = await db.scalar(
+        select(LearningPlan)
+        .where(LearningPlan.user_id == current_user.id)
+        .order_by(LearningPlan.id.desc())
+        .options(selectinload(LearningPlan.tasks))
+    )
+    if not plan:
+        return LearningProgressOut()
+
+    report = await db.scalar(
+        select(MatchReport.position_title).where(MatchReport.id == plan.report_id)
+    )
+    tasks = sorted(
+        plan.tasks,
+        key=lambda t: ({"high": 0, "medium": 1, "low": 2}.get(t.priority or "medium", 1), t.id),
+    )
+    total = len(tasks)
+    done = sum(1 for t in tasks if t.status == "done")
+    in_progress = sum(1 for t in tasks if t.status == "in_progress")
+    return LearningProgressOut(
+        has_plan=True,
+        position_title=report,
+        total_tasks=total,
+        done_tasks=done,
+        in_progress_tasks=in_progress,
+        progress=round(done / total * 100) if total else 0,
+        tasks=[
+            {"id": t.id, "task_name": t.task_name, "status": t.status, "priority": t.priority}
+            for t in tasks[:5]
+        ],
+    )
+
+
 @router.get("/{match_id}", response_model=MatchOut)
 async def get_match_detail(
     match_id: str,
@@ -142,6 +200,14 @@ async def get_match_detail(
     )
     if not result:
         raise HTTPException(status_code=404, detail="匹配报告不存在")
+
+    # 补充岗位公司/城市（岗位可能已删除，判空不挂载）与分析来源
+    job = await db.scalar(select(JobAnalysis).where(JobAnalysis.id == result.job_id))
+    if job:
+        job_parsed = job.parsed_json or {}
+        result.company = job_parsed.get("company")
+        result.city = job_parsed.get("city")
+    result.analysis_source = (result.detail_json or {}).get("analysis_source")
     return result
 
 
@@ -170,3 +236,51 @@ async def update_learning_task(
     if not task:
         raise HTTPException(status_code=404, detail="学习任务不存在")
     return task
+
+
+@router.get("/plan/tasks/{task_id}/study", response_model=TaskStudyOut)
+async def get_learning_task_study(
+    task_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """任务学习资料：关联知识点（RAG 检索管理员知识库）+ 当前一批练习题"""
+    study = await get_task_study(task_id, current_user.id, db)
+    if not study:
+        raise HTTPException(status_code=404, detail="学习任务不存在")
+    return study
+
+
+@router.post("/plan/tasks/{task_id}/study/refresh", response_model=TaskStudyOut)
+async def refresh_learning_task_study(
+    task_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """换一批新题：旧题并入历史，生成不重复的新一批练习题（作答记录清空）"""
+    try:
+        study = await refresh_task_study(task_id, current_user.id, db)
+    except ValueError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    if not study:
+        raise HTTPException(status_code=404, detail="学习任务不存在")
+    return study
+
+
+@router.post("/plan/tasks/{task_id}/study/answer")
+async def answer_learning_task_question(
+    task_id: int,
+    payload: TaskAnswerIn,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """提交练习题作答：AI 对比参考答案给出得分与点评"""
+    try:
+        result = await answer_task_question(
+            task_id, current_user.id, db, payload.question, payload.answer
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    if not result:
+        raise HTTPException(status_code=404, detail="学习任务或题目不存在，作答不能为空")
+    return result
