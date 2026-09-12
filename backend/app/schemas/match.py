@@ -1,4 +1,4 @@
-﻿from datetime import datetime
+from datetime import datetime
 from enum import Enum
 from typing import List, Optional
 from pydantic import BaseModel, Field
@@ -52,8 +52,13 @@ class MatchOut(ORMBase):
     experience_match: float = Field(..., ge=0, le=100, description="经验匹配度")
     education_match: float = Field(..., ge=0, le=100, description="教育匹配度")
     overall_score: float = Field(..., ge=0, le=100, description="综合评分")
+    summary: Optional[str] = Field(None, description="LLM 综合分析文字（失败降级为规则文本）")
+    detail_json: Optional[dict] = Field(None, description="分析来源与规则摘要等附加数据")
     gaps: List[GapItem] = Field(default_factory=list, description="差距项")
     recommendations: List[Recommendation] = Field(default_factory=list, description="建议")
+    learning_plan: List["LearningPlanOut"] = Field(
+        default_factory=list, description="学习计划列表（含任务）"
+    )
     created_at: datetime
     analyzed_at: datetime
 
@@ -76,3 +81,38 @@ class MatchAnalysisResult(BaseModel):
     match_report: MatchOut
     feedback: str
     learning_plan: List[dict]
+
+
+class LearningTaskOut(ORMBase):
+    """学习任务输出"""
+    id: int
+    plan_id: int
+    task_name: str
+    description: Optional[str] = None
+    resource_url: Optional[str] = None
+    priority: str = "medium"
+    estimated_days: Optional[int] = None
+    status: str = "todo"
+    due_date: Optional[str] = None
+
+
+class LearningPlanOut(ORMBase):
+    """学习计划输出"""
+    id: int
+    user_id: int
+    report_id: str
+    content_json: Optional[dict] = None
+    status: str = "pending"
+    tasks: List[LearningTaskOut] = Field(default_factory=list, description="学习任务列表")
+
+
+class TaskStatus(str, Enum):
+    """学习任务状态（需求 UC-012：待开始/进行中/已完成）"""
+    TODO = "todo"
+    IN_PROGRESS = "in_progress"
+    DONE = "done"
+
+
+class TaskStatusUpdate(BaseModel):
+    """学习任务状态更新请求"""
+    status: TaskStatus = Field(..., description="任务状态：todo / in_progress / done")

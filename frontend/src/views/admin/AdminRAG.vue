@@ -1,22 +1,68 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import BackButton from '@/components/BackButton.vue'
+import { computed, onMounted, ref } from 'vue'
+import { deleteDocument, listDocuments, uploadDocument, type KnowledgeDoc } from '@/api/knowledge'
 
-const router = useRouter()
-
-const collections = ref<Array<{ docCount?: number }>>([])
+const collections = ref<KnowledgeDoc[]>([])
 const loading = ref(true)
 const error = ref('')
+const uploading = ref(false)
+const fileInput = ref<HTMLInputElement | null>(null)
 
-// 获取RAG知识库列表
+// 文档切片总数（概览卡片用）
+const totalChunks = computed(() =>
+  collections.value.reduce((sum, doc) => sum + (doc.chunk_count || 0), 0)
+)
+
+// 获取知识库文档列表
 const fetchCollections = async () => {
   try {
-    // TODO: 实现从后端获取RAG知识库列表的API调用
+    error.value = ''
+    collections.value = await listDocuments()
+  } catch (err: any) {
+    error.value = err.response?.data?.detail || '获取知识库列表失败'
+    console.error('获取知识库列表失败:', err)
+  } finally {
     loading.value = false
-  } catch (err) {
-    error.value = '获取知识库列表失败'
-    loading.value = false
+  }
+}
+
+// 触发文件选择
+const triggerUpload = () => {
+  fileInput.value?.click()
+}
+
+// 上传文档
+const handleFileChange = async (event: Event) => {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file) return
+
+  try {
+    uploading.value = true
+    error.value = ''
+    const doc = await uploadDocument(file)
+    showAlert(`文档「${doc.title}」入库成功，切分为 ${doc.chunk_count} 个片段`)
+    await fetchCollections()
+  } catch (err: any) {
+    error.value = err.response?.data?.detail || '文档上传失败'
+    console.error('文档上传失败:', err)
+  } finally {
+    uploading.value = false
+    target.value = ''
+  }
+}
+
+// 删除文档
+const handleDelete = async (doc: KnowledgeDoc) => {
+  if (!window.confirm(`确定删除文档「${doc.title}」吗？该操作不可恢复。`)) return
+
+  try {
+    await deleteDocument(doc.id)
+    showAlert('文档已删除')
+    await fetchCollections()
+  } catch (err: any) {
+    error.value = err.response?.data?.detail || '删除失败'
+    console.error('删除文档失败:', err)
   }
 }
 
@@ -32,30 +78,6 @@ onMounted(() => {
 
 <template>
   <div class="admin-rag-page">
-    <div class="page-bg"></div>
-    <div class="page-blob blob-a"></div>
-    <div class="page-blob blob-b"></div>
-
-    <header class="topbar anim-fade">
-      <div class="topbar-left">
-        <BackButton class="topbar-back" />
-        <div class="brand" @click="router.push('/')">
-          <div class="brand-logo">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-            </svg>
-          </div>
-          <span>CareerAI</span>
-        </div>
-      </div>
-      <nav>
-        <button @click="router.push('/admin')">管理员控制台</button>
-        <button @click="router.push('/admin/jobs')">岗位管理</button>
-        <button @click="router.push('/admin/rag')">RAG 知识库</button>
-        <button @click="router.push('/logout')">退出登录</button>
-      </nav>
-    </header>
-
     <main class="content">
       <h2 class="page-title anim-fade-up">RAG 知识库管理</h2>
       <p class="page-sub anim-fade-up anim-delay-1">管理和监控RAG知识库的构建</p>
@@ -95,8 +117,8 @@ onMounted(() => {
             </svg>
           </div>
           <div class="card-content">
-            <h3>文档总数</h3>
-            <p class="number">{{ collections.reduce((sum, col) => sum + (col.docCount || 0), 0) }}</p>
+            <h3>文档切片总数</h3>
+            <p class="number">{{ totalChunks }}</p>
           </div>
         </div>
       </div>
@@ -104,14 +126,21 @@ onMounted(() => {
       <!-- 知识库列表 -->
       <div class="collections-section anim-fade-up anim-delay-3">
         <div class="section-header">
-          <h3>知识库列表</h3>
-          <button class="add-btn" @click="showAlert('添加新知识库功能开发中')">
+          <h3>知识库文档</h3>
+          <button class="add-btn" @click="triggerUpload" :disabled="uploading">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="12" y1="5" x2="12" y2="19"></line>
               <line x1="5" y1="12" x2="19" y2="12"></line>
             </svg>
-            添加知识库
+            {{ uploading ? '上传解析中...' : '上传文档' }}
           </button>
+          <input
+            ref="fileInput"
+            type="file"
+            accept=".pdf,.doc,.docx,.md,.txt"
+            style="display: none"
+            @change="handleFileChange"
+          />
         </div>
 
         <div v-if="loading" class="loading">
@@ -132,11 +161,26 @@ onMounted(() => {
               <line x1="16" y1="17" x2="8" y2="17"></line>
               <polyline points="10 9 9 9 8 9"></polyline>
             </svg>
-            <p>暂无知识库</p>
+            <p>暂无知识库文档</p>
             <p class="hint">请先上传岗位文档创建知识库</p>
           </div>
 
-          <!-- TODO: 实现知识库列表渲染 -->
+          <div v-for="doc in collections" :key="doc.id" class="doc-card">
+            <div class="doc-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+              </svg>
+            </div>
+            <div class="doc-info">
+              <h4>{{ doc.title }}</h4>
+              <div class="doc-meta">
+                <span class="doc-type">{{ doc.file_type }}</span>
+                <span class="doc-chunks">{{ doc.chunk_count }} 个切片</span>
+              </div>
+            </div>
+            <button class="delete-btn" @click="handleDelete(doc)">删除</button>
+          </div>
         </div>
       </div>
     </main>
@@ -144,66 +188,10 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.admin-rag-page { min-height: 100vh; position: relative; overflow: hidden; }
-.page-bg {
-  position: fixed; inset: 0; z-index: -2;
-  background: linear-gradient(-45deg, #667eea, #764ba2, #f093fb, #4facfe);
-  background-size: 400% 400%;
-  animation: gradientShift 12s ease infinite;
-}
-.page-blob {
-  position: fixed; border-radius: 50%; filter: blur(70px); z-index: -1;
-  animation: float 8s ease-in-out infinite;
-}
-.blob-a { width: 320px; height: 320px; background: #667eea; opacity: 0.1; top: -60px; left: -40px; }
-.blob-b { width: 280px; height: 280px; background: #f093fb; opacity: 0.08; bottom: -40px; right: -30px; animation-delay: -4s; }
-
-/* 顶栏 */
-.topbar {
-  background: rgba(255,255,255,0.7);
-  backdrop-filter: blur(16px);
-  padding: 0.9rem 2rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  box-shadow: 0 2px 16px rgba(0,0,0,0.06);
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  border-bottom: 1px solid rgba(255,255,255,0.5);
-}
-.brand { display: flex; align-items: center; gap: 0.6rem; font-weight: 800; font-size: 1.15rem; cursor: pointer; }
-.topbar-left { display: flex; align-items: center; gap: 0.9rem; }
-.brand-logo {
-  width: 36px; height: 36px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, var(--primary), var(--secondary));
-  color: #fff;
-  display: flex; align-items: center; justify-content: center;
-  animation: pulse 3s ease-in-out infinite;
-}
-.brand-logo svg { width: 20px; height: 20px; }
-.topbar nav { display: flex; gap: 0.5rem; }
-.topbar nav button {
-  display: flex; align-items: center; gap: 0.4rem;
-  padding: 0.5rem 1rem;
-  border: 1px solid #e2e8f0;
-  background: #fff;
-  border-radius: 10px;
-  cursor: pointer;
-  font-size: 0.9rem;
-  transition: all 0.25s ease;
-}
-.topbar nav button:hover {
-  background: linear-gradient(135deg, var(--primary), var(--secondary));
-  color: #fff;
-  border-color: transparent;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(102,126,234,0.35);
-}
+.admin-rag-page { position: relative; }
 
 /* 主体 */
-.content { padding: 2rem; max-width: 1100px; margin: 0 auto; }
+.content { padding: 0; max-width: 1100px; margin: 0 auto; }
 .page-title { font-size: 1.5rem; color: #1a202c; }
 .page-sub { color: #718096; margin: 0.3rem 0 1.8rem; }
 
@@ -263,6 +251,59 @@ onMounted(() => {
   margin-bottom: 1.5rem;
 }
 .collections-section .section-header h3 { font-size: 1.2rem; color: #2d3748; }
+.add-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+/* 文档卡片 */
+.doc-card {
+  background: rgba(255,255,255,0.6);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.5);
+  border-radius: 16px;
+  padding: 1.2rem 1.4rem;
+  box-shadow: 0 2px 16px rgba(0,0,0,0.04);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.doc-icon {
+  width: 46px; height: 46px;
+  border-radius: 12px;
+  background: rgba(102,126,234,0.1);
+  display: flex; align-items: center; justify-content: center;
+  color: #667eea;
+  flex-shrink: 0;
+}
+.doc-info { flex: 1; min-width: 0; }
+.doc-info h4 {
+  font-size: 1rem;
+  color: #2d3748;
+  margin-bottom: 0.3rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.doc-meta { display: flex; gap: 0.6rem; }
+.doc-type, .doc-chunks {
+  font-size: 0.78rem;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  background: rgba(102,126,234,0.1);
+  color: #5a67d8;
+  font-weight: 500;
+}
+.doc-chunks { background: rgba(72,187,120,0.1); color: #38a169; }
+.delete-btn {
+  padding: 0.4rem 0.9rem;
+  border: 1px solid #fc8181;
+  background: #fff;
+  color: #e53e3e;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  flex-shrink: 0;
+}
+.delete-btn:hover { background: #e53e3e; color: #fff; border-color: transparent; }
 .add-btn {
   display: inline-flex;
   align-items: center;
@@ -306,19 +347,6 @@ onMounted(() => {
 .empty-state p { color: #718096; margin-bottom: 0.5rem; }
 .empty-state .hint { font-size: 0.9rem; color: #a0aec0; }
 
-@keyframes gradientShift {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-@keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-20px); }
-}
-@keyframes pulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-}
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
