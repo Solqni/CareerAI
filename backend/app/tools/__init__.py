@@ -10,12 +10,19 @@
 - @tool 包装版本（可被 LLM tool-calling 调用，独立开 DB session）
 """
 
+from app.tools.interview_helper import generate_interview_q, generate_interview_q_impl
 from app.tools.job_analyzer import analyze_job_impl, job_analyzer
 from app.tools.knowledge_searcher import knowledge_searcher, search_knowledge_impl
 from app.tools.resume_reader import read_resume_impl, resume_reader
 from app.tools.skill_matcher import match_skills_impl, skill_matcher
 
-ALL_TOOLS = [resume_reader, job_analyzer, skill_matcher, knowledge_searcher]
+ALL_TOOLS = [
+    resume_reader,
+    job_analyzer,
+    skill_matcher,
+    knowledge_searcher,
+    generate_interview_q,
+]
 
 __all__ = [
     "resume_reader",
@@ -26,5 +33,7 @@ __all__ = [
     "match_skills_impl",
     "knowledge_searcher",
     "search_knowledge_impl",
+    "generate_interview_q",
+    "generate_interview_q_impl",
     "ALL_TOOLS",
 ]
