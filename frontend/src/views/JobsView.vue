@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, nextTick, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import BackButton from '@/components/BackButton.vue'
 import { useJobStore } from '@/stores/job'
+import { getJob } from '@/api/job'
 
 const router = useRouter()
 const jobStore = useJobStore()
@@ -43,6 +44,28 @@ async function handleDeleteJob(job: any) {
     console.error('删除岗位失败:', e)
   } finally {
     deletingJobId.value = null
+  }
+}
+
+// 双击岗位行：加载并展示该岗位的分析详情（共享岗位也可查看）
+const detailLoadingId = ref<number | null>(null)
+
+async function showJobDetail(job: any) {
+  if (detailLoadingId.value) return
+  detailLoadingId.value = job.id
+  errorMsg.value = ''
+  try {
+    const { data: detail } = await getJob(job.id)
+    jobStore.currentJob = detail
+    result.value = detail.parsed_json
+    editing.value = false
+    await nextTick()
+    document.querySelector('.result-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  } catch (e: any) {
+    errorMsg.value = e.response?.data?.detail || '加载岗位详情失败'
+    console.error('加载岗位详情失败:', e)
+  } finally {
+    detailLoadingId.value = null
   }
 }
 
@@ -297,13 +320,21 @@ async function handleSave() {
     <div class="result-card anim-fade-up">
       <div class="result-header">
         <h3>我的岗位</h3>
+        <span class="job-hint">双击岗位可查看分析详情</span>
       </div>
       <div v-if="jobStore.loading" class="list-empty">加载中...</div>
       <div v-else-if="!jobStore.jobs.length" class="list-empty">暂无岗位分析记录，上传 JD 或截图后会在此列出</div>
       <ul v-else class="job-list">
-        <li v-for="job in jobStore.jobs" :key="job.id" class="job-item">
+        <li
+          v-for="job in jobStore.jobs"
+          :key="job.id"
+          class="job-item"
+          :class="{ loading: detailLoadingId === job.id }"
+          title="双击查看分析详情"
+          @dblclick="showJobDetail(job)"
+        >
           <div class="job-item-info">
-            <strong>{{ jobTitle(job) }}</strong>
+            <strong>{{ jobTitle(job) }}<span v-if="detailLoadingId === job.id" class="spinner spinner-sm"></span></strong>
             <small>{{ [jobCompany(job), fmtDate(job.created_at)].filter(Boolean).join(' · ') }}</small>
           </div>
           <div class="job-item-actions">
@@ -537,12 +568,24 @@ async function handleSave() {
 }
 
 /* 我的岗位列表 */
+.job-hint { font-size: 0.78rem; color: #a0aec0; font-weight: 400; }
 .list-empty { color: #a0aec0; font-size: 0.9rem; text-align: center; padding: 1.2rem 0; }
 .job-list { list-style: none; margin: 0; padding: 0; }
 .job-item {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 0.9rem 0.2rem;
+  padding: 0.9rem 0.4rem;
   border-bottom: 1px solid #edf2f7;
+  cursor: pointer;
+  transition: background 0.15s;
+  border-radius: 8px;
+}
+.job-item:hover { background: #f7fafc; }
+.job-item.loading { opacity: 0.55; pointer-events: none; }
+.spinner-sm {
+  display: inline-block; width: 12px; height: 12px;
+  margin-left: 0.5rem; vertical-align: middle;
+  border: 2px solid #cbd5e0; border-top-color: #764ba2; border-radius: 50%;
+  animation: spin 0.7s linear infinite;
 }
 .job-item:last-child { border-bottom: none; }
 .job-item-info { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; }
