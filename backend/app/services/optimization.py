@@ -13,7 +13,7 @@ Agent 根据目标岗位要求对用户简历生成结构化优化建议：
 
 import json
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.llm.client import get_chat_llm
