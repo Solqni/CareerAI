@@ -32,6 +32,8 @@ class JobListItem(ORMBase):
     parsed_json: dict | None = None
     created_at: datetime
     requirement_count: int = 0
+    is_shared: bool = False
+    is_owner: bool = True
 
 
 # ===== LLM 结构化输出 =====

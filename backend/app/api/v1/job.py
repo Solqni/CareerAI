@@ -1,7 +1,7 @@
 import base64
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from sqlalchemy import delete, select
+from sqlalchemy import delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -109,10 +109,15 @@ async def list_jobs(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """岗位知识库：当前用户的岗位分析列表。"""
+    """岗位知识库：当前用户的岗位 + 管理员共享岗位（AI 采集）。"""
     result = await db.scalars(
         select(JobAnalysis)
-        .where(JobAnalysis.user_id == current_user.id)
+        .where(
+            or_(
+                JobAnalysis.user_id == current_user.id,
+                JobAnalysis.is_shared.is_(True),
+            )
+        )
         .options(selectinload(JobAnalysis.requirements))
         .order_by(JobAnalysis.id.desc())
     )
@@ -123,6 +128,8 @@ async def list_jobs(
             parsed_json=job.parsed_json,
             created_at=job.created_at,
             requirement_count=len(job.requirements),
+            is_shared=job.is_shared,
+            is_owner=job.user_id == current_user.id,
         )
         for job in result.all()
     ]
