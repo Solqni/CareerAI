@@ -15,7 +15,11 @@ def get_chat_llm() -> ChatOpenAI:
 
 
 def get_vision_llm() -> ChatOpenAI:
-    """获取视觉 LLM 实例（识别 JD 截图等图片，走同一 OpenAI 兼容端点）。"""
+    """获取视觉 LLM 实例（识别 JD 截图等图片，走同一 OpenAI 兼容端点）。
+
+    vl_high_resolution_images=True：DashScope qwen-vl 专属参数，
+    对长图/密集小字截图保留原始分辨率，避免默认缩图丢字。
+    """
     return ChatOpenAI(
         model=settings.DEEPSEEK_VISION_MODEL,
         api_key=settings.DEEPSEEK_API_KEY,
@@ -23,6 +27,7 @@ def get_vision_llm() -> ChatOpenAI:
         temperature=0,
         timeout=settings.LLM_TIMEOUT,
         max_retries=1,
+        extra_body={"vl_high_resolution_images": True},
     )
 
 

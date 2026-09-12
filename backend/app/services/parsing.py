@@ -143,15 +143,18 @@ async def parse_jd(jd_text: str) -> JDParsedResult:
     return result
 
 
-JD_IMAGE_PROMPT = """你是一位专业的岗位信息提取助手。请从这张图片中提取完整的岗位描述（JD）文字内容。
+JD_IMAGE_PROMPT = """你是一位专业的岗位信息提取助手。这张图片很可能是一张招聘信息截图（来自招聘 App、招聘网站或公司官网），请从中提取完整的岗位描述（JD）文字内容。
 
-要求：
-1. 逐字提取图片中与岗位相关的所有文字，保持原始顺序和段落结构
-2. 包括岗位名称、岗位职责、任职要求、技能要求、薪资待遇、公司信息等
-3. 不要添加图片中不存在的内容，不要总结或改写
-4. 如果图片中没有岗位相关的文字内容，只返回"NO_JD_CONTENT"
+识别要求：
+1. 这可能是 App 界面截图：请先整体浏览，再分区仔细阅读——顶部标题区（岗位名、薪资、城市）、中部详情区（岗位职责、任职要求）、底部标签区（技能标签、福利待遇、公司信息）
+2. 图片中的文字可能较小或密集，请逐行仔细辨认，宁多勿漏；对模糊文字结合上下文推断，不要轻易放弃
+3. 保留原文的编号、换行和段落结构，按"岗位职责 / 任职要求 / 技能要求 / 薪资福利 / 公司信息"等原始标题组织
+4. 忽略与岗位内容无关的界面元素文字（如"立即沟通"、"收藏"、"分享"等按钮、导航栏、状态栏、水印）
+5. 如果是深色模式（深色背景浅色文字）或表格布局，同样正常提取
+6. 不要添加图片中不存在的内容，不要总结或改写原文
 
-直接返回提取的纯文本，不要包含任何解释。"""
+输出格式：直接返回提取的纯文本（可保留原始小标题），不要包含任何解释或评论。
+仅当图片中确实没有任何与岗位/招聘相关的文字时，只返回"NO_JD_CONTENT"。"""
 
 
 async def extract_jd_text_from_image(image_data_url: str) -> str:
@@ -166,10 +169,16 @@ async def extract_jd_text_from_image(image_data_url: str) -> str:
             {"type": "text", "text": JD_IMAGE_PROMPT},
         ]
     )
-    response = await llm.ainvoke([message])
+    try:
+        response = await llm.ainvoke([message])
+    except Exception as e:
+        raise ValueError(f"图片识别服务调用失败（{type(e).__name__}），请稍后重试或改用文本粘贴") from e
+
     content = response.content if isinstance(response.content, str) else str(response.content)
     text = content.strip()
 
     if not text or "NO_JD_CONTENT" in text:
         raise ValueError("无法从图片中识别出岗位描述内容，请确认图片包含完整的 JD 文字")
+    if len(text) < 30:
+        raise ValueError("图片中识别到的岗位文字过少，建议上传更清晰、完整的 JD 截图")
     return text

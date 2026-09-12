@@ -194,7 +194,7 @@ async function handleSave() {
           <circle cx="8.5" cy="8.5" r="1.5" />
           <path d="M21 15l-5-5L5 21" />
         </svg>
-        <p>上传 JD 截图，AI 直接识别图中文字：拖拽图片到此处，或 <span class="link">点击上传</span></p>
+        <p>上传 JD 截图（招聘 App / 网站均可），AI 高精度识别图中文字并解析岗位要求；拖拽图片到此处，或 <span class="link">点击上传</span></p>
         <small>支持 JPG / PNG / WebP / BMP，大小不超过 10MB，识别后自动解析</small>
       </div>
     </div>
