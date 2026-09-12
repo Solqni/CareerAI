@@ -195,8 +195,18 @@ async def ai_collect_jobs(
     except Exception as e:
         return fail(f"岗位采集失败：{e}", code=500)
     if not result.get("collected_count"):
+        if result.get("skipped_count"):
+            return ok(
+                result,
+                message=f"本次抓取到的 {result['skipped_count']} 条岗位均已存在于岗位库，已自动去重跳过",
+            )
         return fail("本次采集未成功入库任何岗位，请更换关键词后重试", code=502)
-    return ok(result, message=f"采集完成：{result['source_label']}，成功 {result['collected_count']} 条")
+    msg = f"采集完成：{result['source_label']}，新增 {result['collected_count']} 条"
+    if result.get("skipped_count"):
+        msg += f"，去重跳过 {result['skipped_count']} 条重复岗位"
+    if result.get("failed_count"):
+        msg += f"，失败 {result['failed_count']} 条"
+    return ok(result, message=msg)
 
 
 @router.post("/knowledge/ai-collect")

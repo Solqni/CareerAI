@@ -70,7 +70,7 @@ npm run dev   # http://localhost:5173
 | GET /api/v1/interview/sessions、GET /interview/session/{id} | 面试历史列表 / 详情（含问答与评估） |
 | POST /api/v1/interview/session/{id}/answer | body {qa_id, answer}：LLM 三维度评估，返回本轮评估 + next_qa |
 | POST /api/v1/interview/session/{id}/finish | 结束面试，LLM 汇总总评写入 session.summary |
-| POST /api/v1/admin/jobs/ai-collect | AI 采集岗位 {keyword, count 1-10}：真实爬取 ncss，失败降级 LLM 模拟；入库即 is_shared 全平台可见（约 15-60s） |
+| POST /api/v1/admin/jobs/ai-collect | AI 采集岗位 {keyword, count 1-10}：真实爬取 ncss，失败降级 LLM 模拟；按（岗位名+招聘单位）自动去重（批内+与库中共享岗位比对），入库即 is_shared 全平台可见（约 15-60s） |
 | POST /api/v1/admin/knowledge/ai-collect | AI 采集知识文档 {topic, doc_count 1-3}：LLM 生成并走 RAG 切片+向量化入库 |
 | GET /api/v1/admin/jobs、DELETE /admin/jobs/{id} | 全平台岗位列表（含来源/归属）/ 删除岗位及关联数据 |
 | PATCH /api/v1/admin/users/{id} | 修改用户信息（username/email/role/password 全可选，仅提交字段生效） |

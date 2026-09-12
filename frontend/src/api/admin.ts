@@ -40,6 +40,8 @@ export interface CollectJobsResult {
   keyword: string
   collected: CollectedJob[]
   collected_count: number
+  skipped?: { existing_id: number; position_title: string; company: string }[]
+  skipped_count?: number
   failed_count: number
 }
 

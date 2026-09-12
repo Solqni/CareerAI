@@ -168,14 +168,24 @@ onMounted(() => {
           <p v-if="collectError" class="collect-error">{{ collectError }}</p>
           <div v-if="collectResult" class="collect-result">
             <p class="result-title">
-              采集完成（{{ collectResult.source_label }}）：成功 {{ collectResult.collected_count }} 条
+              采集完成（{{ collectResult.source_label }}）：新增 {{ collectResult.collected_count }} 条
+              <template v-if="collectResult.skipped_count">，去重跳过 {{ collectResult.skipped_count }} 条</template>
               <template v-if="collectResult.failed_count">，失败 {{ collectResult.failed_count }} 条</template>
+              <template v-if="!collectResult.collected_count && collectResult.skipped_count">
+                ——本次抓取到的岗位均已存在于岗位库
+              </template>
             </p>
-            <ul>
+            <ul v-if="collectResult.collected.length">
               <li v-for="c in collectResult.collected" :key="c.id">
                 #{{ c.id }} {{ c.position_title || '未命名岗位' }}
                 <template v-if="c.company"> · {{ c.company }}</template>
                 <template v-if="c.city"> · {{ c.city }}</template>
+              </li>
+            </ul>
+            <ul v-if="collectResult.skipped?.length">
+              <li v-for="(s, i) in collectResult.skipped" :key="`skip-${i}`" class="skipped-item">
+                已存在：{{ s.position_title }}
+                <template v-if="s.company"> · {{ s.company }}</template>
               </li>
             </ul>
           </div>
@@ -362,6 +372,7 @@ onMounted(() => {
 .result-title { font-size: 0.9rem; font-weight: 600; color: #22543d; margin-bottom: 0.5rem; }
 .collect-result ul { list-style: none; }
 .collect-result li { font-size: 0.85rem; color: #4a5568; padding: 0.15rem 0; }
+.collect-result li.skipped-item { color: #a0aec0; }
 
 /* 岗位列表 */
 .jobs-section { margin-bottom: 2rem; }

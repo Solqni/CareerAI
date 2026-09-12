@@ -15,6 +15,7 @@ import logging
 import re
 
 import httpx
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import JobAnalysis, JobRequirement
@@ -168,10 +169,33 @@ async def _llm_fallback_jobs(keyword: str, count: int) -> list[dict]:
         return []
 
 
+async def _find_existing_shared_job(
+    db: AsyncSession, title: str | None, company: str | None
+) -> int | None:
+    """按（岗位名 + 招聘单位）在共享岗位库中查重，命中返回已存在的 job id。"""
+    if not title:
+        return None
+    stmt = select(JobAnalysis.id).where(
+        JobAnalysis.is_shared.is_(True),
+        func.coalesce(JobAnalysis.parsed_json["position_title"].as_string(), "") == title,
+    )
+    if company:
+        stmt = stmt.where(
+            func.coalesce(JobAnalysis.parsed_json["company"].as_string(), "") == company
+        )
+    else:
+        stmt = stmt.where(JobAnalysis.parsed_json["company"].is_(None))
+    return (await db.scalars(stmt.limit(1))).first()
+
+
 async def collect_jobs_from_web(
     db: AsyncSession, admin_user_id: int, keyword: str, count: int
 ) -> dict:
-    """管理员采集入口：真实爬取 ncss → 解析入库；失败降级 LLM 模拟。"""
+    """管理员采集入口：真实爬取 ncss → 查重 → 解析入库；失败降级 LLM 模拟。
+
+    查重规则：岗位名+招聘单位 相同即视为同一岗位（批内 & 与库中共享岗位比对），
+    重复条目跳过不入库。
+    """
     source, source_label = "web_ncss", f"实时采集（{_PLATFORM_LABEL}）"
     items: list[dict] = []
     try:
@@ -182,14 +206,25 @@ async def collect_jobs_from_web(
     if not items:
         source, source_label = "ai_fallback", "AI 模拟（真实站点暂无数据）"
         items = await _llm_fallback_jobs(keyword, count)
-        item_ctx = None
-    else:
-        item_ctx = None
 
-    collected, failed = [], 0
-    for item in items[:count]:
+    collected, skipped, failed = [], [], 0
+    seen: set[tuple[str, str]] = set()  # 批内（岗位名, 单位）去重
+    for item in items:
+        if len(collected) >= count:
+            break
+        title = str(item.get("jobName") or "").strip()
+        company = str(item.get("recName") or "").strip()
+        key = (title, company)
+        if not title or key in seen:
+            continue
         try:
+            existing_id = await _find_existing_shared_job(db, title, company)
+            if existing_id is not None:
+                seen.add(key)
+                skipped.append({"existing_id": existing_id, "position_title": title, "company": company})
+                continue
             job = await _parse_and_save(db, admin_user_id, _build_jd_text(item), item, source)
+            seen.add(key)
             if job is None:
                 failed += 1
                 continue
@@ -214,5 +249,7 @@ async def collect_jobs_from_web(
         "keyword": keyword,
         "collected": collected,
         "collected_count": len(collected),
+        "skipped": skipped,
+        "skipped_count": len(skipped),
         "failed_count": failed,
     }

@@ -53,15 +53,23 @@ print("1. 管理员登录 OK")
 t0 = time.time()
 status, res = call("POST", "/admin/jobs/ai-collect", {"keyword": "Python", "count": 3}, ADMIN)
 data, msg = unwrap(res)
-assert status == 200 and data.get("collected_count") >= 1, f"岗位采集失败: {res}"
+assert status == 200, f"岗位采集失败: {res}"
+assert data["source"] == "web_ncss", f"预期真实爬取，实际 {data['source']}"
 print(
     f"2. 岗位采集 OK（{time.time()-t0:.0f}s，来源 {data['source_label']}，"
-    f"成功 {data['collected_count']} 条，失败 {data['failed_count']} 条）"
+    f"新增 {data['collected_count']} 条，去重跳过 {data.get('skipped_count')} 条，失败 {data['failed_count']} 条）"
 )
 for c in data["collected"]:
     print(f"   - #{c['id']} {c.get('position_title')} | {c.get('company')} | {c.get('city')}")
-assert data["source"] == "web_ncss", f"预期真实爬取，实际 {data['source']}"
+for s in data.get("skipped") or []:
+    print(f"   重复跳过：{s.get('position_title')} | {s.get('company')}（已存在 #{s.get('existing_id')}）")
 shared_job_ids = [c["id"] for c in data["collected"]]
+# 全部去重跳过时，从管理员岗位库取已有的实时采集岗位做可见性验证
+if not shared_job_ids:
+    status, res = call("GET", "/admin/jobs", token=ADMIN)
+    jobs_admin, _ = unwrap(res)
+    shared_job_ids = [j["id"] for j in jobs_admin if j.get("source") == "web_ncss"][:3]
+assert shared_job_ids, "岗位库中没有任何实时采集岗位可用于验证"
 
 # ---------- 3. 普通用户可见共享岗位 ----------
 _, res = call("POST", "/auth/login", {"username": "agenttest", "password": "agent1234"})
