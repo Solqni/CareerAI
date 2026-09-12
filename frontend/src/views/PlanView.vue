@@ -66,7 +66,13 @@ async function toggleStudy(task: LearningTask) {
     return
   }
   expandedIds.value = new Set(expandedIds.value).add(id)
-  if (studyMap.value[id] || studyErrors.value[id]) return
+  if (studyMap.value[id]) return
+  // 上次加载失败时清除错误缓存，允许重试
+  if (studyErrors.value[id]) {
+    const errors = { ...studyErrors.value }
+    delete errors[id]
+    studyErrors.value = errors
+  }
   loadingStudyId.value = id
   try {
     const study = await getTaskStudy(id)
@@ -147,6 +153,9 @@ async function refreshQuestions(task: LearningTask) {
     const errors = { ...actionErrors.value }
     delete errors[task.id]
     actionErrors.value = errors
+    const loadErrors = { ...studyErrors.value }
+    delete loadErrors[task.id]
+    studyErrors.value = loadErrors
   } catch (err: any) {
     actionErrors.value = {
       ...actionErrors.value,
@@ -330,11 +339,10 @@ const statusMeta: Record<string, { label: string; color: string }> = {
                         </span>
                       </h5>
                       <button
-                        v-if="studyMap[task.id].questions.length"
                         class="action-btn refresh"
                         :disabled="refreshingId === task.id"
                         @click="refreshQuestions(task)"
-                      >{{ refreshingId === task.id ? '正在出新题...' : '换一批新题' }}</button>
+                      >{{ refreshingId === task.id ? '正在出题...' : (studyMap[task.id].questions.length ? '换一批新题' : '重试出题') }}</button>
                     </div>
                     <div v-if="actionErrors[task.id]" class="study-error">{{ actionErrors[task.id] }}</div>
                     <ol v-if="studyMap[task.id].questions.length" class="question-list">
@@ -371,7 +379,7 @@ const statusMeta: Record<string, { label: string; color: string }> = {
                         </div>
                       </li>
                     </ol>
-                    <p v-else class="study-empty">练习题生成失败或暂不可用，可先学习上方知识点</p>
+                    <p v-else class="study-empty">练习题暂未生成，点击右上角"重试出题"再试一次</p>
                   </div>
                 </template>
                 <div v-else class="study-loading">

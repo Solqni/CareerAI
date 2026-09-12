@@ -108,3 +108,20 @@ class ProfileOut(BaseModel):
     experiences: list[str] = []
     summary: str | None = None
     parsed_json: dict | None = Field(default=None, description="最新简历解析完整结果")
+
+
+class ProfileUpdate(BaseModel):
+    """更新最新简历基本信息（编辑简历弹层保存）。"""
+
+    name: str | None = Field(None, min_length=1, max_length=50, description="姓名")
+    email: str | None = Field(None, max_length=120, description="邮箱")
+    phone: str | None = Field(None, max_length=30, description="电话")
+    summary: str | None = Field(None, max_length=2000, description="个人概述")
+
+    @field_validator("name", "email", "phone", "summary")
+    @classmethod
+    def _strip(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        v = v.strip()
+        return v or None

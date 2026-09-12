@@ -8,6 +8,7 @@
 """
 
 import json
+import logging
 import re
 from datetime import date, timedelta
 
@@ -324,8 +325,6 @@ async def _load_task(task_id: int, user_id: int, db: AsyncSession) -> LearningTa
 
 async def _retrieve_knowledge(task: LearningTask, db: AsyncSession) -> list[dict]:
     """RAG 实时检索关联知识点（失败降级为空列表，不阻断）。"""
-    import logging
-
     from app.services.rag import search_knowledge
 
     try:
@@ -360,7 +359,7 @@ async def get_task_study(task_id: int, user_id: int, db: AsyncSession) -> dict |
     knowledge = await _retrieve_knowledge(task, db)
     cache = _study_cache(task)
 
-    # 首次查看且无缓存题目：生成第一批（此处不写缓存，写缓存统一由 refresh/首次生成路径处理）
+    # 首次查看且无缓存题目：生成第一批（写缓存统一由生成成功路径处理）
     if not cache["questions"]:
         try:
             questions = await _generate_questions(task, knowledge, cache["asked"])
@@ -371,7 +370,9 @@ async def get_task_study(task_id: int, user_id: int, db: AsyncSession) -> dict |
                 task.study_json = cache
                 await db.commit()
         except Exception:
-            pass  # 生成失败降级为仅知识点，下次查看重试
+            logging.getLogger(__name__).exception(
+                "学习任务 %s 练习题生成失败，本次降级仅返回知识点", task_id
+            )  # 生成失败降级为仅知识点，下次查看或重试出题再试
 
     return _study_result(task, knowledge, cache, cache.get("source", "rag_only"))
 

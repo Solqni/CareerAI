@@ -77,3 +77,18 @@ export function uploadResumeFile(file: File) {
     timeout: 120000,
   })
 }
+
+/** 更新最新简历的基本信息（姓名/邮箱/电话/个人概述），返回更新后的能力画像 */
+export function updateResumeProfile(payload: {
+  name?: string
+  email?: string
+  phone?: string
+  summary?: string
+}): Promise<Profile> {
+  return api.put<Profile>('/resume/profile', payload).then(r => r.data)
+}
+
+/** 删除本人指定简历（关联的面试会话仅解除引用，会话保留） */
+export function deleteResume(id: number) {
+  return api.delete(`/resume/${id}`)
+}
