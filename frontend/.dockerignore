@@ -1,0 +1,24 @@
+# 依赖与构建产物（镜像内重新安装/构建，绝不能带入宿主机产物）
+node_modules
+dist
+dist-ssr
+*.local
+
+# 环境变量（运行时由 compose 注入）
+.env
+.env.*
+!.env.example
+
+# 日志与缓存
+*.log
+npm-debug.log*
+.vite
+.cache
+
+# 版本控制 / IDE / Docker 自身
+.git
+.gitignore
+.vscode
+.idea
+Dockerfile
+.dockerignore

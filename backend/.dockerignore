@@ -1,0 +1,36 @@
+# Python 缓存与虚拟环境（镜像内重新装依赖）
+__pycache__/
+*.py[cod]
+*.egg-info
+.pytest_cache
+venv/
+.venv/
+env/
+
+# 本地数据库（容器内使用 PostgreSQL）
+*.db
+*.sqlite
+*.sqlite3
+careerai.db
+
+# 环境变量（运行时由 compose env_file 注入，避免打进镜像泄露 Key）
+.env
+.env.*
+!.env.example
+
+# 上传文件与日志（用数据卷持久化）
+uploads/
+*.log
+logs/
+
+# 测试文件（生产镜像不需要）
+test_*.py
+tests/
+
+# 版本控制 / IDE / Docker 自身
+.git
+.gitignore
+.vscode
+.idea
+Dockerfile
+.dockerignore

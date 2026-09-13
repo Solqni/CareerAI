@@ -6,6 +6,8 @@ python-multipart==0.0.9
 # ===== 数据验证 & 配置 =====
 pydantic==2.9.2
 pydantic-settings==2.5.2
+# pydantic EmailStr 校验依赖（缺失会在启动时 ImportError）
+email-validator==2.2.0
 
 # ===== 数据库 =====
 SQLAlchemy[asyncio]==2.0.35
@@ -18,6 +20,8 @@ redis==5.0.8
 
 # ===== 安全 =====
 passlib[bcrypt]==1.7.4
+# passlib 1.7.4 与 bcrypt>=4.1 不兼容（探测阶段抛 ValueError），钉在 4.0.x
+bcrypt==4.0.1
 python-jose[cryptography]==3.3.0
 
 # ===== AI / LLM =====

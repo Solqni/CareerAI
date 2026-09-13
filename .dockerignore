@@ -1,0 +1,21 @@
+# 根上下文忽略规则（当前 compose 的构建上下文为 ./frontend 与 ./backend，
+# 实际生效的是各自目录下的 .dockerignore；此文件供以根目录为上下文构建时使用）
+**/node_modules
+**/dist
+**/__pycache__
+**/*.py[cod]
+**/venv
+**/.venv
+**/.pytest_cache
+**/.vite
+**/uploads
+**/*.db
+**/*.sqlite*
+**/.env
+**/.env.*
+!**/.env.example
+**/*.log
+.git
+.gitignore
+.vscode
+.idea
