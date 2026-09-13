@@ -4,13 +4,20 @@ from app.core.config import settings
 
 
 def get_chat_llm() -> ChatOpenAI:
-    """获取 DeepSeek Chat LLM 实例（基于 OpenAI 兼容接口）。"""
+    """获取对话 LLM 实例（百炼 OpenAI 兼容接口）。
+
+    enable_thinking=False：关闭思考模式（思维链）。qwen3.8-flash 等模型默认
+    开启，实测单次调用从 6s 涨到 17~27s，且思维链 token 按输出计费更贵。
+    该参数对当前候选模型（qwen3.8-flash / deepseek-v4-flash / qwen-flash /
+    qwen-turbo）均兼容；如需更强推理，在 .env 置 LLM_ENABLE_THINKING=true。
+    """
     return ChatOpenAI(
         model=settings.DEEPSEEK_CHAT_MODEL,
         api_key=settings.DEEPSEEK_API_KEY,
         base_url=settings.DEEPSEEK_BASE_URL,
         temperature=settings.LLM_TEMPERATURE,
         timeout=settings.LLM_TIMEOUT,
+        extra_body={"enable_thinking": settings.LLM_ENABLE_THINKING},
     )
 
 

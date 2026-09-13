@@ -54,6 +54,10 @@ class Settings(BaseSettings):
     DEEPSEEK_EMBEDDING_MODEL: str = "text-embedding-v3"
     EMBEDDING_DIMENSIONS: int = 1024
     LLM_TEMPERATURE: float = 0.3
+    # 是否启用思考模式（思维链）：qwen3.8-flash 等模型默认开启，实测单次调用
+    # 从 6s 涨到 17~27s，且思维链 token 按输出计费（更贵）。默认关闭，
+    # 需要更强推理能力时可在 .env 置 true
+    LLM_ENABLE_THINKING: bool = False
     # LLM 请求超时（秒）：出题/总评/匹配分析等长生成实测可超 60s，
     # 需大于前端对应接口的超时预算内的 LLM 环节，避免后端先被砍掉返回 500
     LLM_TIMEOUT: int = 240
