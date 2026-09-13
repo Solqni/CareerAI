@@ -1,7 +1,7 @@
 # CareerAI · AI求职与职业成长智能体
 
 > 集简历解析、岗位分析、能力匹配、学习规划、面试准备于一体的 AI 智能体平台。
-> 技术路线：**Python + FastAPI + LangChain（路线B）**
+> 技术路线：**Python + FastAPI + LangChain**
 
 ## 项目简介
 
