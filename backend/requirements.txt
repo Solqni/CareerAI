@@ -5,12 +5,14 @@ python-multipart==0.0.9
 
 # ===== 数据验证 & 配置 =====
 pydantic==2.9.2
-pydantic-settings==2.5.2
+pydantic-settings==2.15.0
+# EmailStr 的运行时依赖，缺失会导致应用启动即 ImportError
+email-validator==2.3.0
 
 # ===== 数据库 =====
 SQLAlchemy[asyncio]==2.0.35
 asyncpg==0.31.0
-pgvector>=0.4.0
+pgvector==0.5.0
 aiosqlite==0.20.0
 
 # ===== 缓存 =====
@@ -18,16 +20,19 @@ redis==5.0.8
 
 # ===== 安全 =====
 passlib[bcrypt]==1.7.4
+# 必须锁定 4.x：bcrypt 5.x 会拒绝 passlib 自检传入的超 72 字节密码，导致注册/登录 500
+bcrypt==4.0.1
 python-jose[cryptography]==3.3.0
 
 # ===== AI / LLM =====
-langchain>=0.3.13
-langchain-core>=0.3.13
-langchain-openai>=0.2.0
-langgraph>=0.2.22
-langchain-text-splitters>=0.3.0
-langchain-community>=0.3.13
-openai==1.45.0
+# langchain 全系列需与 langgraph/openai 版本配套锁定，放开范围会解析出不兼容的旧版本
+langchain==1.4.0
+langchain-core==1.6.2
+langchain-openai==1.6.0
+langchain-community==0.4.2
+langchain-text-splitters==1.1.2
+langgraph==1.2.11
+openai==3.8.0
 
 # ===== 文档解析 =====
 python-docx==1.1.2
